@@ -49,8 +49,8 @@ var (
 			ListenIp:   "0.0.0.0",
 			ListenPort: 4443,
 			TLS: TLSConfig{
-				Cert: filepath.Join(dirname, "certs", "localhost.pem"),
-				Key:  filepath.Join(dirname, "certs", "localhost.key"),
+				Cert: filepath.Join(dirname, "certs", "fullchain.pem"),
+				Key:  filepath.Join(dirname, "certs", "privkey.key"),
 			},
 		},
 		Mediasoup: MediasoupConfig{
