@@ -3,12 +3,6 @@
 A demo application of [mediasoup-go](https://github.com/jiyeyuran/mediasoup-go).
 
 
-## Resources
-
-* mediasoup website and documentation: [mediasoup.org](https://mediasoup.org)
-* mediasoup support forum: [mediasoup.discourse.group](https://mediasoup.discourse.group)
-
-
 ## Installation
 
 * Clone the project:
