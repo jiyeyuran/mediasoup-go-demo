@@ -7,7 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/boz/go-throttle"
 	"github.com/jiyeyuran/go-eventemitter"
 	"github.com/jiyeyuran/go-protoo"
 	"github.com/jiyeyuran/mediasoup-go"
@@ -25,7 +24,6 @@ type Room struct {
 	audioLevelObserver mediasoup.IRtpObserver
 	bot                *Bot
 	networkThrottled   bool
-	throttle           throttle.Throttle
 	broadcasters       sync.Map
 	closed             uint32
 }
@@ -166,9 +164,6 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 
 	peer.On("request", func(request protoo.Message, accept func(data interface{}), reject func(err error)) {
 		r.logger.Debug().Str("method", request.Method).Str("peerId", peerId).Msg(`protoo Peer "request" event`)
-
-		locker.Lock()
-		defer locker.Unlock()
 
 		err := r.handleProtooRequest(peer, request, accept)
 		if err != nil {
@@ -900,8 +895,13 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 		return
 	}
 
+	locker := r.getPeerLocker(consumerPeer.Id())
+	locker.Lock()
+
 	// Store the Consumer into the protoo consumerPeer data Object.
 	consumerPeerData.Consumers[consumer.Id()] = consumer
+
+	locker.Unlock()
 
 	// Set Consumer events.
 	consumer.On("transportclose", func() {
@@ -965,35 +965,38 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 			Msg(`consumer "trace" event`)
 	})
 
-	// Send a protoo request to the remote Peer with Consumer parameters.
-	rsp := consumerPeer.Request("newConsumer", H{
-		"peerId":         producerPeer.Id(),
-		"producerId":     producer.Id(),
-		"id":             consumer.Id(),
-		"kind":           consumer.Kind(),
-		"rtpParameters":  consumer.RtpParameters(),
-		"type":           consumer.Type(),
-		"appData":        consumer.AppData(),
-		"producerPaused": consumer.ProducerPaused(),
-	})
-	if rsp.Err() != nil {
-		r.logger.Warn().Err(rsp.Err()).Msg("createConsumer() | failed")
-		return
-	}
+	go func() {
 
-	// Now that we got the positive response from the remote endpoint, resume
-	// the Consumer so the remote endpoint will receive the a first RTP packet
-	// of this new stream once its PeerConnection is already ready to process
-	// and associate it.
-	if err = consumer.Resume(); err != nil {
-		r.logger.Warn().Err(err).Msg("createConsumer() | failed")
-		return
-	}
+		// Send a protoo request to the remote Peer with Consumer parameters.
+		rsp := consumerPeer.Request("newConsumer", H{
+			"peerId":         producerPeer.Id(),
+			"producerId":     producer.Id(),
+			"id":             consumer.Id(),
+			"kind":           consumer.Kind(),
+			"rtpParameters":  consumer.RtpParameters(),
+			"type":           consumer.Type(),
+			"appData":        consumer.AppData(),
+			"producerPaused": consumer.ProducerPaused(),
+		})
+		if rsp.Err() != nil {
+			r.logger.Warn().Err(rsp.Err()).Msg("createConsumer() | failed")
+			return
+		}
 
-	consumerPeer.Notify("consumerScore", H{
-		"consumerId": consumer.Id(),
-		"score":      consumer.Score(),
-	})
+		// Now that we got the positive response from the remote endpoint, resume
+		// the Consumer so the remote endpoint will receive the a first RTP packet
+		// of this new stream once its PeerConnection is already ready to process
+		// and associate it.
+		if err = consumer.Resume(); err != nil {
+			r.logger.Warn().Err(err).Msg("createConsumer() | failed")
+			return
+		}
+
+		consumerPeer.Notify("consumerScore", H{
+			"consumerId": consumer.Id(),
+			"score":      consumer.Score(),
+		})
+	}()
 }
 
 func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Peer, dataProducer *mediasoup.DataProducer) {
@@ -1028,8 +1031,13 @@ func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Pee
 		return
 	}
 
+	locker := r.getPeerLocker(dataConsumerPeer.Id())
+	locker.Lock()
+
 	// Store the Consumer into the protoo consumerPeer data Object.
 	dataConsumerPeerData.DataConsumers[dataConsumer.Id()] = dataConsumer
+
+	locker.Unlock()
 
 	// Set DataConsumer events.
 	dataConsumer.On("transportclose", func() {
@@ -1057,20 +1065,22 @@ func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Pee
 		peerId = &id
 	}
 
-	// Send a protoo request to the remote Peer with Consumer parameters.
-	rsp := dataConsumerPeer.Request("newDataConsumer", H{
-		// This is null for bot DataProducer.
-		"peerId":               peerId,
-		"dataProducerId":       dataProducer.Id(),
-		"id":                   dataConsumer.Id(),
-		"sctpStreamParameters": dataConsumer.SctpStreamParameters(),
-		"label":                dataConsumer.Label(),
-		"protocol":             dataConsumer.Protocol(),
-		"appData":              dataConsumer.AppData(),
-	})
-	if rsp.Err() != nil {
-		r.logger.Warn().Err(rsp.Err()).Msg("createDataConsumer() | failed")
-	}
+	go func() {
+		// Send a protoo request to the remote Peer with Consumer parameters.
+		rsp := dataConsumerPeer.Request("newDataConsumer", H{
+			// This is null for bot DataProducer.
+			"peerId":               peerId,
+			"dataProducerId":       dataProducer.Id(),
+			"id":                   dataConsumer.Id(),
+			"sctpStreamParameters": dataConsumer.SctpStreamParameters(),
+			"label":                dataConsumer.Label(),
+			"protocol":             dataConsumer.Protocol(),
+			"appData":              dataConsumer.AppData(),
+		})
+		if rsp.Err() != nil {
+			r.logger.Warn().Err(rsp.Err()).Msg("createDataConsumer() | failed")
+		}
+	}()
 }
 
 func (r *Room) getJoinedPeers(excludePeer *protoo.Peer) (peers []*protoo.Peer) {
