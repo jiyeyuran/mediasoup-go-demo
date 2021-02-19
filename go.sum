@@ -125,8 +125,8 @@ github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH
 github.com/jiyeyuran/go-eventemitter v1.1.0/go.mod h1:8l80Tzn7/W5Hzo6VkOhkB5gNpPTiBC/RnxB2CkhVWVY=
 github.com/jiyeyuran/go-eventemitter v1.1.1 h1:0h4U9LYG2MmKIj5WdaEahQrcmLgKVp+gmO+RyWgMhaY=
 github.com/jiyeyuran/go-eventemitter v1.1.1/go.mod h1:8l80Tzn7/W5Hzo6VkOhkB5gNpPTiBC/RnxB2CkhVWVY=
-github.com/jiyeyuran/go-protoo v1.0.0 h1:iDKymvrWos+Siiu+a4pS1KsgjCpAvrwqu/fo4ITXfaQ=
-github.com/jiyeyuran/go-protoo v1.0.0/go.mod h1:ISLCKNSSEUUeySDS4+3HMSKDmcH+RE5Ds/LupjE0Heg=
+github.com/jiyeyuran/go-protoo v1.0.1 h1:KYzbY6TB8bnjr1IqDsZFJMTS4k4jUPc9wArdiKHkr5g=
+github.com/jiyeyuran/go-protoo v1.0.1/go.mod h1:ISLCKNSSEUUeySDS4+3HMSKDmcH+RE5Ds/LupjE0Heg=
 github.com/jiyeyuran/mediasoup-go v1.6.32 h1:m2hEKsn7NO7U3iahfhq4PpJ1NPI1dqIIpAX5EpTg6+Y=
 github.com/jiyeyuran/mediasoup-go v1.6.32/go.mod h1:ePGfnjaV8z2d6h0Y00TimoMlkZ9a0cvtq3SNgwAn8Gk=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
