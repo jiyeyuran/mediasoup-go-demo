@@ -80,6 +80,10 @@ func (r *Room) Close() {
 	}
 }
 
+func (r *Room) Closed() bool {
+	return atomic.LoadUint32(&r.closed) > 0
+}
+
 func (r *Room) LogStatus() {
 	dump, err := r.mediasoupRouter.Dump()
 	if err != nil {
@@ -159,7 +163,33 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 	r.peerLockers.Store(peer.Id(), locker)
 
 	peer.On("close", func() {
+		if r.Closed() {
+			return
+		}
+		r.logger.Debug().Str("peerId", peer.Id()).Msg(`protoo Peer "close" event`)
 		r.peerLockers.Delete(peer.Id())
+		data := peer.Data().(*PeerData)
+
+		// If the Peer was joined, notify all Peers.
+		if data.Joined {
+			for _, otherPeer := range r.getJoinedPeers(peer) {
+				otherPeer.Notify("peerClosed", H{
+					"peerId": peer.Id(),
+				})
+			}
+		}
+
+		// Iterate and close all mediasoup Transport associated to this Peer, so all
+		// its Producers and Consumers will also be closed.
+		for _, transport := range data.Transports {
+			transport.Close()
+		}
+
+		// If this is the latest Peer in the room, close the room.
+		if len(r.protooRoom.Peers()) == 0 {
+			r.logger.Info().Str("roomId", r.roomId).Msg(`last Peer in the room left, closing the room`)
+			r.Close()
+		}
 	})
 
 	peer.On("request", func(request protoo.Message, accept func(data interface{}), reject func(err error)) {
