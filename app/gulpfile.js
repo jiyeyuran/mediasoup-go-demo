@@ -55,6 +55,8 @@ const cssBase64 = require('gulp-css-base64');
 const nib = require('nib');
 const browserSync = require('browser-sync');
 
+const config = require('./config');
+
 const PKG = require('./package.json');
 const BANNER = fs.readFileSync('banner.txt').toString();
 const BANNER_OPTIONS =
@@ -247,8 +249,6 @@ gulp.task('live', gulp.series(
 	'browser:base',
 	(done) =>
 	{
-		const config = require('../server/config');
-
 		browserSync(
 			{
 				open      : 'external',
@@ -271,8 +271,6 @@ gulp.task('devel', gulp.series(
 	'browser:base',
 	async (done) =>
 	{
-		const config = require('../server/config');
-
 		await new Promise((resolve) =>
 		{
 			browserSync.create('producer1').init(
@@ -317,8 +315,6 @@ gulp.task('devel:tcp', gulp.series(
 	'browser:base',
 	async (done) =>
 	{
-		const config = require('../server/config');
-
 		await new Promise((resolve) =>
 		{
 			browserSync.create('producer1').init(
@@ -363,8 +359,6 @@ gulp.task('devel:vp9', gulp.series(
 	'browser:base',
 	async (done) =>
 	{
-		const config = require('../server/config');
-
 		await new Promise((resolve) =>
 		{
 			browserSync.create('producer1').init(
@@ -409,8 +403,6 @@ gulp.task('devel:h264', gulp.series(
 	'browser:base',
 	async (done) =>
 	{
-		const config = require('../server/config');
-
 		await new Promise((resolve) =>
 		{
 			browserSync.create('producer1').init(
