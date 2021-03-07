@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/jiyeyuran/go-eventemitter"
 	"github.com/jiyeyuran/go-protoo"
@@ -167,7 +168,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 			return
 		}
 		r.logger.Debug().Str("peerId", peer.Id()).Msg(`protoo Peer "close" event`)
-		r.peerLockers.Delete(peer.Id())
+
 		data := peer.Data().(*PeerData)
 
 		// If the Peer was joined, notify all Peers.
@@ -190,6 +191,11 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 			r.logger.Info().Str("roomId", r.roomId).Msg(`last Peer in the room left, closing the room`)
 			r.Close()
 		}
+
+		// delay for a second to clean locker
+		time.AfterFunc(time.Second, func() {
+			r.peerLockers.Delete(peer.Id())
+		})
 	})
 
 	peer.On("request", func(request protoo.Message, accept func(data interface{}), reject func(err error)) {
