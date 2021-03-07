@@ -941,14 +941,12 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 			"score":      score,
 		})
 	})
-	consumer.On("layerschange", func(layers *mediasoup.ConsumerLayers) {
+	consumer.On("layerschange", func(layers mediasoup.ConsumerLayers) {
 		notifyData := H{
 			"consumerId": consumer.Id(),
 		}
-		if layers != nil {
-			notifyData["spatialLayer"] = layers.SpatialLayer
-			notifyData["temporalLayer"] = layers.TemporalLayer
-		}
+		notifyData["spatialLayer"] = layers.SpatialLayer
+		notifyData["temporalLayer"] = layers.TemporalLayer
 		consumerPeer.Notify("consumerLayersChanged", notifyData)
 	})
 
