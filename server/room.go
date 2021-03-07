@@ -172,7 +172,6 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 	})
 
 	return
-
 }
 
 func (r *Room) handleAudioLevelObserver() {
