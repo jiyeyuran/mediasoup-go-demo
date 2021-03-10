@@ -53,7 +53,7 @@ func CreateRoom(config Config, roomId string, worker *mediasoup.Worker) (room *R
 		return
 	}
 
-	return &Room{
+	room = &Room{
 		IEventEmitter:      eventemitter.NewEventEmitter(),
 		logger:             logger,
 		config:             config,
@@ -62,18 +62,22 @@ func CreateRoom(config Config, roomId string, worker *mediasoup.Worker) (room *R
 		mediasoupRouter:    mediasoupRouter,
 		audioLevelObserver: audioLevelObserver,
 		bot:                bot,
-	}, nil
+	}
+	room.handleAudioLevelObserver()
+
+	return
 }
 
 func (r *Room) Close() {
-	r.logger.Debug().Msg("close()")
-
 	if atomic.CompareAndSwapUint32(&r.closed, 0, 1) {
+		r.logger.Debug().Msg("close()")
+
 		r.protooRoom.Close()
 		r.mediasoupRouter.Close()
 		r.bot.Close()
 
 		r.SafeEmit("close")
+		r.RemoveAllListeners()
 
 		if r.networkThrottled {
 			//TODO: throttle stop
@@ -999,7 +1003,6 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 	})
 
 	go func() {
-
 		// Send a protoo request to the remote Peer with Consumer parameters.
 		rsp := consumerPeer.Request("newConsumer", H{
 			"peerId":         producerPeer.Id(),

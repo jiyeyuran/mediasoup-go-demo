@@ -43,7 +43,7 @@ func (b Bot) DataProducer() *mediasoup.DataProducer {
 }
 
 func (b Bot) Close() {
-
+	b.transport.Close()
 }
 
 func (b *Bot) HandlePeerDataProducer(dataProducerId string, peer *protoo.Peer) (err error) {

@@ -4,12 +4,13 @@ go 1.15
 
 require (
 	github.com/gin-contrib/cors v1.3.1
+	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.6.3
 	github.com/gobwas/glob v0.2.3
 	github.com/gorilla/websocket v1.4.2
-	github.com/jiyeyuran/go-eventemitter v1.1.2
-	github.com/jiyeyuran/go-protoo v1.0.1
-	github.com/jiyeyuran/mediasoup-go v1.6.34
+	github.com/jiyeyuran/go-eventemitter v1.3.0
+	github.com/jiyeyuran/go-protoo v1.0.3
+	github.com/jiyeyuran/mediasoup-go v1.6.37
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/rs/zerolog v1.20.0
 	github.com/sirupsen/logrus v1.8.0 // indirect

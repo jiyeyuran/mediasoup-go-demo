@@ -21,9 +21,9 @@ const PC_PROPRIETARY_CONSTRAINTS =
 // Used for simulcast webcam video.
 const WEBCAM_SIMULCAST_ENCODINGS =
 [
-	{ scaleResolutionDownBy: 4, maxBitrate: 500000 },
-	{ scaleResolutionDownBy: 2, maxBitrate: 1000000 },
-	{ scaleResolutionDownBy: 1, maxBitrate: 5000000 }
+	{ scaleResolutionDownBy: 4, maxBitrate: 50000 },
+	{ scaleResolutionDownBy: 2, maxBitrate: 100000 },
+	{ scaleResolutionDownBy: 1, maxBitrate: 500000 }
 ];
 
 // Used for VP9 webcam video.

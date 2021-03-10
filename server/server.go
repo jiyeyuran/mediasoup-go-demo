@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jiyeyuran/go-protoo/transport"
@@ -260,6 +261,8 @@ func (s *Server) Run() {
 		}
 		c.JSON(200, rsp)
 	})
+
+	pprof.Register(r)
 
 	// setup websocket
 	r.GET("/", s.runProtooWebSocketServer)
