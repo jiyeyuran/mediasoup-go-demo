@@ -52,8 +52,8 @@ func broadcastersFlagSet(opts *Options) *flag.FlagSet {
 	flagSet.StringVar(&opts.ServerURL, "s", opts.ServerURL, "the URL of the mediasoup-demo API server")
 	flagSet.StringVar(&opts.RoomID, "room_id", opts.RoomID, "the id of the mediasoup-demo room (it must exist in advance)")
 	flagSet.StringVar(&opts.RoomID, "r", opts.RoomID, "the id of the mediasoup-demo room (it must exist in advance)")
-	flagSet.StringVar(&opts.MediaFile, "media_file", opts.MediaFile, "the path to a audio+video file (such as a .mp4 file)")
-	flagSet.StringVar(&opts.MediaFile, "m", opts.MediaFile, "the path to a audio+video file (such as a .mp4 file)")
+	flagSet.StringVar(&opts.MediaFile, "media_file", opts.MediaFile, "the path to a audio+video file (such as a .mp4 or .webm file)")
+	flagSet.StringVar(&opts.MediaFile, "m", opts.MediaFile, "the path to a audio+video file (such as a .mp4 or .webm file)")
 	flagSet.BoolVar(&opts.VerifyCert, "verify_cert", opts.VerifyCert, "whether verify tls certification or not")
 
 	return flagSet
