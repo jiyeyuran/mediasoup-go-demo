@@ -12,7 +12,9 @@ require (
 	github.com/jiyeyuran/go-protoo v1.0.3
 	github.com/jiyeyuran/mediasoup-go v1.6.37
 	github.com/magefile/mage v1.11.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rs/zerolog v1.20.0
+	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.8.0 // indirect
 	github.com/spf13/viper v1.7.1
 	golang.org/x/sys v0.0.0-20210218155724-8ebf48af031b // indirect

@@ -28,11 +28,11 @@ type TLSConfig struct {
 }
 
 type MediasoupConfig struct {
-	NumWorkers               int                             `json:"numWorkers,omitempty"`
-	WorkerSettings           mediasoup.WorkerSettings        `json:"workerSettings,omitempty"`
-	RouterOptions            mediasoup.RouterOptions         `json:"routerOptions,omitempty"`
-	WebRtcTransportOptions   WebRtcTransportOptions          `json:"webRtcTransportOptions,omitempty"`
-	PlainRtpTransportOptions mediasoup.PlainTransportOptions `json:"plainRtpTransportOptions,omitempty"`
+	NumWorkers             int                             `json:"numWorkers,omitempty"`
+	WorkerSettings         mediasoup.WorkerSettings        `json:"workerSettings,omitempty"`
+	RouterOptions          mediasoup.RouterOptions         `json:"routerOptions,omitempty"`
+	WebRtcTransportOptions WebRtcTransportOptions          `json:"webRtcTransportOptions,omitempty"`
+	PlainTransportOptions  mediasoup.PlainTransportOptions `json:"plainTransportOptions,omitempty"`
 }
 
 type WebRtcTransportOptions struct {
@@ -140,7 +140,7 @@ var (
 				},
 				MaxIncomingBitrate: 1500000,
 			},
-			PlainRtpTransportOptions: mediasoup.PlainTransportOptions{
+			PlainTransportOptions: mediasoup.PlainTransportOptions{
 				ListenIp: mediasoup.TransportListenIp{
 					Ip:          GetOutboundIP(),
 					AnnouncedIp: GetOutboundIP(),

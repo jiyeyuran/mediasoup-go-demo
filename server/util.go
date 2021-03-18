@@ -1,6 +1,10 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
+
+type H map[string]interface{}
 
 func NewBool(b bool) *bool {
 	return &b

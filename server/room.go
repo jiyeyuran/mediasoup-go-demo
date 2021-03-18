@@ -10,6 +10,7 @@ import (
 
 	"github.com/jiyeyuran/go-eventemitter"
 	"github.com/jiyeyuran/go-protoo"
+	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
 	"github.com/jiyeyuran/mediasoup-go"
 	"github.com/rs/zerolog"
 )
@@ -98,45 +99,13 @@ func (r *Room) LogStatus() {
 
 	r.logger.Info().
 		Str("roomId", r.roomId).
-		Int("peers", len(r.getJoinedPeers(nil))).
+		Int("peers", len(r.getJoinedPeers())).
 		Int("transports", len(dump.TransportIds)).
 		Msg("logStatus()")
 }
 
 func (r *Room) GetRouterRtpCapabilities() mediasoup.RtpCapabilities {
 	return r.mediasoupRouter.RtpCapabilities()
-}
-
-func (r *Room) CreateBroadcaster(request CreateBroadcasterRequest) (data H, err error) {
-	return
-}
-
-func (r *Room) DeleteBroadcaster(broadcasterId string) (err error) {
-	return
-}
-
-func (r *Room) CreateBroadcasterTransport(request CreateBroadcasterTransportRequest) (rsp CreateBroadcasterTransportResponse, err error) {
-	return
-}
-
-func (r *Room) ConnectBroadcasterTransport(request ConnectBroadcasterTransportRequest) (rsp ConnectBroadcasterTransportResponse, err error) {
-	return
-}
-
-func (r *Room) CreateBroadcasterProducer(request CreateBroadcasterProducerRequest) (rsp CreateBroadcasterProducerResponse, err error) {
-	return
-}
-
-func (r *Room) CreateBroadcasterConsumer(request CreateBroadcasterConsumerRequest) (rsp CreateBroadcasterConsumerResponse, err error) {
-	return
-}
-
-func (r *Room) CreateBroadcasterDataConsumer(request CreateBroadcasterDataConsumerRequest) (rsp CreateBroadcasterDataConsumerResponse, err error) {
-	return
-}
-
-func (r *Room) CreateBroadcasterDataProducer(request CreateBroadcasterDataProducerRequest) (rsp CreateBroadcasterDataProducerResponse, err error) {
-	return
 }
 
 func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport) (err error) {
@@ -149,14 +118,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 		existingPeer.Close()
 	}
 
-	peerData := &PeerData{
-		Transports:    make(map[string]mediasoup.ITransport),
-		Producers:     make(map[string]*mediasoup.Producer),
-		Consumers:     make(map[string]*mediasoup.Consumer),
-		DataProducers: make(map[string]*mediasoup.DataProducer),
-		DataConsumers: make(map[string]*mediasoup.DataConsumer),
-	}
-
+	peerData := proto.NewPeerData()
 	peer, err := r.protooRoom.CreatePeer(peerId, peerData, transport)
 	if err != nil {
 		r.logger.Err(err).Msg("protooRoom.createPeer() failed")
@@ -173,7 +135,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 		}
 		r.logger.Debug().Str("peerId", peer.Id()).Msg(`protoo Peer "close" event`)
 
-		data := peer.Data().(*PeerData)
+		data := peer.Data().(*proto.PeerData)
 
 		// If the Peer was joined, notify all Peers.
 		if data.Joined {
@@ -186,7 +148,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 
 		// Iterate and close all mediasoup Transport associated to this Peer, so all
 		// its Producers and Consumers will also be closed.
-		for _, transport := range data.Transports {
+		for _, transport := range data.Transports() {
 			transport.Close()
 		}
 
@@ -223,7 +185,7 @@ func (r *Room) handleAudioLevelObserver() {
 			Str("producerId", producer.Id()).Int("volume", volume).
 			Msg(`audioLevelObserver "volumes" event`)
 
-		for _, peer := range r.getJoinedPeers(nil) {
+		for _, peer := range r.getJoinedPeers() {
 			peer.Notify("activeSpeaker", map[string]interface{}{
 				"peerId": producer.AppData().(H)["peerId"],
 				"volume": volume,
@@ -234,7 +196,7 @@ func (r *Room) handleAudioLevelObserver() {
 	r.audioLevelObserver.On("silence", func() {
 		r.logger.Debug().Msg(`audioLevelObserver "silence" event`)
 
-		for _, peer := range r.getJoinedPeers(nil) {
+		for _, peer := range r.getJoinedPeers() {
 			peer.Notify("activeSpeaker", map[string]interface{}{
 				"peerId": nil,
 			})
@@ -243,7 +205,7 @@ func (r *Room) handleAudioLevelObserver() {
 }
 
 func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, accept func(data interface{})) (err error) {
-	peerData := peer.Data().(*PeerData)
+	peerData := peer.Data().(*proto.PeerData)
 
 	switch request.Method {
 	case "getRouterRtpCapabilities":
@@ -255,7 +217,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			return
 		}
 
-		requestData := PeerData{}
+		requestData := proto.PeerData{}
 
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
@@ -270,7 +232,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 
 		joinedPeers := []*protoo.Peer{}
 
-		for _, peer := range r.getJoinedPeers(nil) {
+		for _, peer := range r.getJoinedPeers() {
 			joinedPeers = append(joinedPeers, peer)
 		}
 
@@ -281,14 +243,14 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			return true
 		})
 
-		peerInfos := []*PeerInfo{}
+		peerInfos := []*proto.PeerInfo{}
 
 		for _, joinedPeer := range joinedPeers {
 			if joinedPeer.Id() == peer.Id() {
 				continue
 			}
-			data := joinedPeer.Data().(*PeerData)
-			peerInfos = append(peerInfos, &PeerInfo{
+			data := joinedPeer.Data().(*proto.PeerData)
+			peerInfos = append(peerInfos, &proto.PeerInfo{
 				Id:          joinedPeer.Id(),
 				DisplayName: data.DisplayName,
 				Device:      data.Device,
@@ -298,15 +260,15 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		accept(H{"peers": peerInfos})
 
 		for _, joinedPeer := range joinedPeers {
-			data := joinedPeer.Data().(*PeerData)
+			data := joinedPeer.Data().(*proto.PeerData)
 
 			// Create Consumers for existing Producers.
-			for _, producer := range data.Producers {
-				r.createConsumer(peer, joinedPeer, producer)
+			for _, producer := range data.Producers() {
+				r.createConsumer(peer, joinedPeer.Id(), producer)
 			}
 
 			// 	// Create DataConsumers for existing DataProducers.
-			for _, dataProducer := range data.DataProducers {
+			for _, dataProducer := range data.DataProducers() {
 				r.createDataConsumer(peer, joinedPeer, dataProducer)
 			}
 		}
@@ -316,7 +278,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 
 		// // Notify the new Peer to all other Peers.
 		for _, otherPeer := range r.getJoinedPeers(peer) {
-			otherPeer.Notify("newPeer", &PeerInfo{
+			otherPeer.Notify("newPeer", &proto.PeerInfo{
 				Id:          peer.Id(),
 				DisplayName: peerData.DisplayName,
 				Device:      peerData.Device,
@@ -344,7 +306,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 				webRtcTransportOptions.NumSctpStreams = requestData.SctpCapabilities.NumStreams
 			}
 
-			webRtcTransportOptions.AppData = &TransportData{
+			webRtcTransportOptions.AppData = &proto.TransportData{
 				Producing: requestData.Producing,
 				Consuming: requestData.Consuming,
 			}
@@ -386,7 +348,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			})
 
 			// Store the WebRtcTransport into the protoo Peer data Object.
-			peerData.Transports[transport.Id()] = transport
+			peerData.AddTransport(transport)
 
 			accept(H{
 				"id":             transport.Id(),
@@ -411,8 +373,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		transport, ok := peerData.Transports[requestData.TransportId]
-		if !ok {
+		transport := peerData.GetTransport(requestData.TransportId)
+		if transport == nil {
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
@@ -428,8 +390,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		transport, ok := peerData.Transports[requestData.TransportId]
-		if !ok {
+		transport := peerData.GetTransport(requestData.TransportId)
+		if transport == nil {
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
@@ -454,8 +416,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		transport, ok := peerData.Transports[requestData.TransportId]
-		if !ok {
+		transport := peerData.GetTransport(requestData.TransportId)
+		if transport == nil {
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
@@ -477,7 +439,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			return err
 		}
 		// Store the Producer into the protoo Peer data Object.
-		peerData.Producers[producer.Id()] = producer
+		peerData.AddProducer(producer)
 
 		producer.On("score", func(score []mediasoup.ProducerScore) {
 			r.logger.Debug().Str("producerId", producer.Id()).Interface("score", score).Msg(`producer "score" event`)
@@ -511,7 +473,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 
 		// Optimization: Create a server-side Consumer for each Peer.
 		for _, otherPeer := range r.getJoinedPeers(peer) {
-			r.createConsumer(otherPeer, peer, producer)
+			r.createConsumer(otherPeer, peer.Id(), producer)
 		}
 
 		// // Add into the audioLevelObserver.
@@ -531,13 +493,13 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		producer, ok := peerData.Producers[requestData.ProducerId]
-		if !ok {
+		producer := peerData.GetProducer(requestData.ProducerId)
+		if producer == nil {
 			err = fmt.Errorf(`producer with id "%s" not found`, requestData.ProducerId)
 			return
 		}
 		producer.Close()
-		delete(peerData.Producers, producer.Id())
+		peerData.DeleteProducer(producer.Id())
 
 		accept(nil)
 
@@ -553,8 +515,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		producer, ok := peerData.Producers[requestData.ProducerId]
-		if !ok {
+		producer := peerData.GetProducer(requestData.ProducerId)
+		if producer == nil {
 			err = fmt.Errorf(`producer with id "%s" not found`, requestData.ProducerId)
 			return
 		}
@@ -576,8 +538,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		producer, ok := peerData.Producers[requestData.ProducerId]
-		if !ok {
+		producer := peerData.GetProducer(requestData.ProducerId)
+		if producer == nil {
 			err = fmt.Errorf(`producer with id "%s" not found`, requestData.ProducerId)
 			return
 		}
@@ -599,8 +561,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		consumer, ok := peerData.Consumers[requestData.ConsumerId]
-		if !ok {
+		consumer := peerData.GetConsumer(requestData.ConsumerId)
+		if consumer == nil {
 			err = fmt.Errorf(`consumer with id "%s" not found`, requestData.ConsumerId)
 			return
 		}
@@ -622,8 +584,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		consumer, ok := peerData.Consumers[requestData.ConsumerId]
-		if !ok {
+		consumer := peerData.GetConsumer(requestData.ConsumerId)
+		if consumer == nil {
 			err = fmt.Errorf(`consumer with id "%s" not found`, requestData.ConsumerId)
 			return
 		}
@@ -646,8 +608,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		consumer, ok := peerData.Consumers[requestData.ConsumerId]
-		if !ok {
+		consumer := peerData.GetConsumer(requestData.ConsumerId)
+		if consumer == nil {
 			err = fmt.Errorf(`consumer with id "%s" not found`, requestData.ConsumerId)
 			return
 		}
@@ -670,8 +632,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		consumer, ok := peerData.Consumers[requestData.ConsumerId]
-		if !ok {
+		consumer := peerData.GetConsumer(requestData.ConsumerId)
+		if consumer == nil {
 			err = fmt.Errorf(`consumer with id "%s" not found`, requestData.ConsumerId)
 			return
 		}
@@ -693,8 +655,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		consumer, ok := peerData.Consumers[requestData.ConsumerId]
-		if !ok {
+		consumer := peerData.GetConsumer(requestData.ConsumerId)
+		if consumer == nil {
 			err = fmt.Errorf(`consumer with id "%s" not found`, requestData.ConsumerId)
 			return
 		}
@@ -720,8 +682,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		transport, ok := peerData.Transports[requestData.TransportId]
-		if !ok {
+		transport := peerData.GetTransport(requestData.TransportId)
+		if transport == nil {
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
@@ -734,7 +696,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err != nil {
 			return err
 		}
-		peerData.DataProducers[dataProducer.Id()] = dataProducer
+		peerData.AddDataProducer(dataProducer)
 
 		accept(H{"id": dataProducer.Id()})
 
@@ -788,8 +750,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		transport, ok := peerData.Transports[requestData.TransportId]
-		if !ok {
+		transport := peerData.GetTransport(requestData.TransportId)
+		if transport == nil {
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
@@ -807,8 +769,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		producer, ok := peerData.Producers[requestData.ProducerId]
-		if !ok {
+		producer := peerData.GetProducer(requestData.ProducerId)
+		if producer == nil {
 			err = fmt.Errorf(`producer with id "%s" not found`, requestData.ProducerId)
 			return
 		}
@@ -826,8 +788,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		consumer, ok := peerData.Consumers[requestData.ConsumerId]
-		if !ok {
+		consumer := peerData.GetConsumer(requestData.ConsumerId)
+		if consumer == nil {
 			err = fmt.Errorf(`consumer with id "%s" not found`, requestData.ConsumerId)
 			return
 		}
@@ -845,8 +807,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		dataProducer, ok := peerData.DataProducers[requestData.DataProducerId]
-		if !ok {
+		dataProducer := peerData.GetDataProducer(requestData.DataProducerId)
+		if dataProducer == nil {
 			err = fmt.Errorf(`dataProducer with id "%s" not found`, requestData.DataProducerId)
 			return
 		}
@@ -864,8 +826,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
 		}
-		dataConsumer, ok := peerData.DataConsumers[requestData.DataConsumerId]
-		if !ok {
+		dataConsumer := peerData.GetDataConsumer(requestData.DataConsumerId)
+		if dataConsumer == nil {
 			err = fmt.Errorf(`dataConsumer with id "%s" not found`, requestData.DataConsumerId)
 			return
 		}
@@ -887,7 +849,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 	return
 }
 
-func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer *mediasoup.Producer) {
+func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, producer *mediasoup.Producer) {
 	// Optimization:
 	// - Create the server-side Consumer in paused mode.
 	// - Tell its Peer about it and wait for its response.
@@ -900,7 +862,7 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 	//   packets are received before the SDP O/A is done) the PeerConnection may
 	//   fail to associate the RTP stream.
 
-	consumerPeerData := consumerPeer.Data().(*PeerData)
+	consumerPeerData := consumerPeer.Data().(*proto.PeerData)
 
 	// NOTE: Don"t create the Consumer if the remote Peer cannot consume it.
 	if consumerPeerData.RtpCapabilities == nil ||
@@ -911,8 +873,8 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 	// Must take the Transport the remote Peer is using for consuming.
 	var transport mediasoup.ITransport
 
-	for _, t := range consumerPeerData.Transports {
-		if data, ok := t.AppData().(*TransportData); ok && data.Consuming {
+	for _, t := range consumerPeerData.Transports() {
+		if data, ok := t.AppData().(*proto.TransportData); ok && data.Consuming {
 			transport = t
 			break
 		}
@@ -934,28 +896,17 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 		return
 	}
 
-	locker := r.getPeerLocker(consumerPeer.Id())
-	locker.Lock()
-
 	// Store the Consumer into the protoo consumerPeer data Object.
-	consumerPeerData.Consumers[consumer.Id()] = consumer
-
-	locker.Unlock()
+	consumerPeerData.AddConsumer(consumer)
 
 	// Set Consumer events.
 	consumer.On("transportclose", func() {
-		locker := r.getPeerLocker(consumerPeer.Id())
-		locker.Lock()
-		defer locker.Unlock()
 		// Remove from its map.
-		delete(consumerPeerData.Consumers, consumer.Id())
+		consumerPeerData.DeleteConsumer(consumer.Id())
 	})
 	consumer.On("producerclose", func() {
-		locker := r.getPeerLocker(consumerPeer.Id())
-		locker.Lock()
-		defer locker.Unlock()
 		// Remove from its map.
-		delete(consumerPeerData.Consumers, consumer.Id())
+		consumerPeerData.DeleteConsumer(consumer.Id())
 		consumerPeer.Notify("consumerClosed", H{
 			"consumerId": consumer.Id(),
 		})
@@ -1005,7 +956,7 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 	go func() {
 		// Send a protoo request to the remote Peer with Consumer parameters.
 		rsp := consumerPeer.Request("newConsumer", H{
-			"peerId":         producerPeer.Id(),
+			"peerId":         producerPeerId,
 			"producerId":     producer.Id(),
 			"id":             consumer.Id(),
 			"kind":           consumer.Kind(),
@@ -1036,7 +987,7 @@ func (r *Room) createConsumer(consumerPeer, producerPeer *protoo.Peer, producer 
 }
 
 func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Peer, dataProducer *mediasoup.DataProducer) {
-	dataConsumerPeerData := dataConsumerPeer.Data().(*PeerData)
+	dataConsumerPeerData := dataConsumerPeer.Data().(*proto.PeerData)
 
 	// NOTE: Don't create the DataConsumer if the remote Peer cannot consume it.
 	if dataConsumerPeerData.SctpCapabilities == nil {
@@ -1046,8 +997,8 @@ func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Pee
 	// Must take the Transport the remote Peer is using for consuming.
 	var transport mediasoup.ITransport
 
-	for _, t := range dataConsumerPeerData.Transports {
-		if data, ok := t.AppData().(*TransportData); ok && data.Consuming {
+	for _, t := range dataConsumerPeerData.Transports() {
+		if data, ok := t.AppData().(*proto.TransportData); ok && data.Consuming {
 			transport = t
 			break
 		}
@@ -1067,28 +1018,17 @@ func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Pee
 		return
 	}
 
-	locker := r.getPeerLocker(dataConsumerPeer.Id())
-	locker.Lock()
-
 	// Store the Consumer into the protoo consumerPeer data Object.
-	dataConsumerPeerData.DataConsumers[dataConsumer.Id()] = dataConsumer
-
-	locker.Unlock()
+	dataConsumerPeerData.AddDataConsumer(dataConsumer)
 
 	// Set DataConsumer events.
 	dataConsumer.On("transportclose", func() {
-		locker := r.getPeerLocker(dataConsumerPeer.Id())
-		locker.Lock()
-		defer locker.Unlock()
 		// Remove from its map.
-		delete(dataConsumerPeerData.Consumers, dataConsumer.Id())
+		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
 	})
 	dataConsumer.On("dataproducerclose", func() {
-		locker := r.getPeerLocker(dataConsumerPeer.Id())
-		locker.Lock()
-		defer locker.Unlock()
 		// Remove from its map.
-		delete(dataConsumerPeerData.Consumers, dataConsumer.Id())
+		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
 		dataConsumerPeer.Notify("dataConsumerClosed", H{
 			"dataConsumerId": dataConsumer.Id(),
 		})
@@ -1119,20 +1059,18 @@ func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Pee
 	}()
 }
 
-func (r *Room) getJoinedPeers(excludePeer *protoo.Peer) (peers []*protoo.Peer) {
+func (r *Room) getJoinedPeers(excludePeers ...*protoo.Peer) (peers []*protoo.Peer) {
 	for _, peer := range r.protooRoom.Peers() {
-		if peer == excludePeer {
-			continue
+		found := false
+		for _, excludePeer := range excludePeers {
+			if peer == excludePeer {
+				found = true
+				break
+			}
 		}
-		peers = append(peers, peer)
+		if !found {
+			peers = append(peers, peer)
+		}
 	}
 	return
-}
-
-func (r *Room) getPeerLocker(peerId string) sync.Locker {
-	val, ok := r.peerLockers.Load(peerId)
-	if !ok {
-		return nil
-	}
-	return val.(sync.Locker)
 }

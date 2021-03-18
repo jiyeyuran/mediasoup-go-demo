@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jiyeyuran/go-protoo/transport"
+	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
 	"github.com/jiyeyuran/mediasoup-go"
 	"github.com/rs/zerolog"
 )
@@ -113,7 +114,7 @@ func (s *Server) Run() {
 	 * POST API to create a Broadcaster.
 	 */
 	r.POST("/rooms/:roomId/broadcasters", func(c *gin.Context) {
-		request := CreateBroadcasterRequest{}
+		request := proto.PeerInfo{}
 
 		if c.BindJSON(&request) != nil {
 			return
@@ -141,7 +142,7 @@ func (s *Server) Run() {
 	 * PlainTransport.
 	 */
 	r.POST("/rooms/:roomId/broadcasters/:broadcasterId/transports", func(c *gin.Context) {
-		request := CreateBroadcasterTransportRequest{
+		request := proto.CreateBroadcasterTransportRequest{
 			BroadcasterId: c.Params.ByName("broadcasterId"),
 		}
 
@@ -161,19 +162,18 @@ func (s *Server) Run() {
 	 * for PlainTransport if it was created with comedia option set to true.
 	 */
 	r.POST("/rooms/:roomId/broadcasters/:broadcasterId/transports/:transportId/connect", func(c *gin.Context) {
-		request := ConnectBroadcasterTransportRequest{
+		request := proto.ConnectBroadcasterTransportRequest{
 			BroadcasterId: c.Params.ByName("broadcasterId"),
 			TransportId:   c.Params.ByName("transportId"),
 		}
 		if c.BindJSON(&request) != nil {
 			return
 		}
-		rsp, err := s.getRoom(c).ConnectBroadcasterTransport(request)
+		err := s.getRoom(c).ConnectBroadcasterTransport(request)
 		if err != nil {
 			c.AbortWithError(500, err)
 			return
 		}
-		c.JSON(200, rsp)
 	})
 
 	/**
@@ -183,7 +183,7 @@ func (s *Server) Run() {
 	 * Producer.
 	 */
 	r.POST("/rooms/:roomId/broadcasters/:broadcasterId/transports/:transportId/producers", func(c *gin.Context) {
-		request := CreateBroadcasterProducerRequest{
+		request := proto.CreateBroadcasterProducerRequest{
 			BroadcasterId: c.Params.ByName("broadcasterId"),
 			TransportId:   c.Params.ByName("transportId"),
 		}
@@ -205,7 +205,7 @@ func (s *Server) Run() {
 	 * consume.
 	 */
 	r.POST("/rooms/:roomId/broadcasters/:broadcasterId/transports/:transportId/consume", func(c *gin.Context) {
-		request := CreateBroadcasterConsumerRequest{
+		request := proto.CreateBroadcasterConsumerRequest{
 			BroadcasterId: c.Params.ByName("broadcasterId"),
 			TransportId:   c.Params.ByName("transportId"),
 		}
@@ -227,7 +227,7 @@ func (s *Server) Run() {
 	 * consume.
 	 */
 	r.POST("/rooms/:roomId/broadcasters/:broadcasterId/transports/:transportId/consume/data", func(c *gin.Context) {
-		request := CreateBroadcasterDataConsumerRequest{
+		request := proto.CreateBroadcasterDataConsumerRequest{
 			BroadcasterId: c.Params.ByName("broadcasterId"),
 			TransportId:   c.Params.ByName("transportId"),
 		}
@@ -247,7 +247,7 @@ func (s *Server) Run() {
 	 * The exact Transport in which the DataProducer must be created is signaled in
 	 */
 	r.POST("/rooms/:roomId/broadcasters/:broadcasterId/transports/:transportId/produce/data", func(c *gin.Context) {
-		request := CreateBroadcasterDataProducerRequest{
+		request := proto.CreateBroadcasterDataProducerRequest{
 			BroadcasterId: c.Params.ByName("broadcasterId"),
 			TransportId:   c.Params.ByName("transportId"),
 		}
@@ -261,6 +261,9 @@ func (s *Server) Run() {
 		}
 		c.JSON(200, rsp)
 	})
+
+	// serve web
+	r.Static("/web", "./public")
 
 	pprof.Register(r)
 

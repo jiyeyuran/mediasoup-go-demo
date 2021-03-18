@@ -17,4 +17,5 @@
 config.toml
 server/server
 certs/
+cert/
 node_modules/
