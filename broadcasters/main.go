@@ -74,7 +74,7 @@ func main() {
 	broadcaster := NewBroadcaster(opts)
 
 	go func() {
-		if err := broadcaster.Start(); err != nil {
+		if err := broadcaster.Run(); err != nil {
 			log.Fatalf("error: %#v", err)
 		}
 	}()

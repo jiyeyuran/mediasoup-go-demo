@@ -74,7 +74,7 @@ func NewBroadcaster(opts *Options) *Broadcaster {
 	}
 }
 
-func (b *Broadcaster) Start() (err error) {
+func (b *Broadcaster) Run() (err error) {
 	b.waitGroup.Add(1)
 	defer b.waitGroup.Done()
 
