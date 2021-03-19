@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -31,6 +32,11 @@ func main() {
 			panic(fmt.Errorf("Fatal error unmarshal config file: %s\n", err))
 		}
 	}
+
+	data, _ := json.MarshalIndent(config, "", "  ")
+
+	fmt.Printf("config:\n%s\n", data)
+	// logger.Info().Interface("config", config).Send()
 
 	server := NewServer(config)
 	server.Run()

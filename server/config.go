@@ -36,7 +36,64 @@ type MediasoupConfig struct {
 }
 
 type WebRtcTransportOptions struct {
-	mediasoup.WebRtcTransportOptions
+	/**
+	 * Listening IP address or addresses in order of preference (first one is the
+	 * preferred one).
+	 */
+	ListenIps []mediasoup.TransportListenIp `json:"listenIps,omitempty"`
+
+	/**
+	 * Listen in UDP. Default true.
+	 */
+	EnableUdp *bool `json:"enableUdp,omitempty"`
+
+	/**
+	 * Listen in TCP. Default false.
+	 */
+	EnableTcp bool `json:"enableTcp,omitempty"`
+
+	/**
+	 * Prefer UDP. Default false.
+	 */
+	PreferUdp bool `json:"preferUdp,omitempty"`
+
+	/**
+	 * Prefer TCP. Default false.
+	 */
+	PreferTcp bool `json:"preferTcp,omitempty"`
+
+	/**
+	 * Initial available outgoing bitrate (in bps). Default 600000.
+	 */
+	InitialAvailableOutgoingBitrate uint32 `json:"initialAvailableOutgoingBitrate,omitempty"`
+
+	/**
+	 * Create a SCTP association. Default false.
+	 */
+	EnableSctp bool `json:"enableSctp,omitempty"`
+
+	/**
+	 * SCTP streams uint32.
+	 */
+	NumSctpStreams mediasoup.NumSctpStreams `json:"numSctpStreams,omitempty"`
+
+	/**
+	 * Maximum allowed size for SCTP messages sent by DataProducers.
+	 * Default 262144.
+	 */
+	MaxSctpMessageSize int `json:"maxSctpMessageSize,omitempty"`
+
+	/**
+	 * Maximum SCTP send buffer used by DataConsumers.
+	 * Default 262144.
+	 */
+	SctpSendBufferSize int `json:"sctpSendBufferSize,omitempty"`
+
+	/**
+	 * Custom application data.
+	 */
+	AppData interface{} `json:"appData,omitempty"`
+
 	// Additional options that are not part of WebRtcTransportOptions.
 	MaxIncomingBitrate int `json:"maxIncomingBitrate,omitempty"`
 }
@@ -128,17 +185,15 @@ var (
 				},
 			},
 			WebRtcTransportOptions: WebRtcTransportOptions{
-				WebRtcTransportOptions: mediasoup.WebRtcTransportOptions{
-					ListenIps: []mediasoup.TransportListenIp{
-						{
-							Ip:          GetOutboundIP(),
-							AnnouncedIp: GetOutboundIP(),
-						},
+				ListenIps: []mediasoup.TransportListenIp{
+					{
+						Ip:          GetOutboundIP(),
+						AnnouncedIp: GetOutboundIP(),
 					},
-					InitialAvailableOutgoingBitrate: 1000000,
-					MaxSctpMessageSize:              262144,
 				},
-				MaxIncomingBitrate: 1500000,
+				InitialAvailableOutgoingBitrate: 1000000,
+				MaxSctpMessageSize:              262144,
+				MaxIncomingBitrate:              1500000,
 			},
 			PlainTransportOptions: mediasoup.PlainTransportOptions{
 				ListenIp: mediasoup.TransportListenIp{
