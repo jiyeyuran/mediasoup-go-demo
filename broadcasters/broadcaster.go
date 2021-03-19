@@ -242,7 +242,7 @@ func (b *Broadcaster) runFFmpeg(audioTransport, videoTransport TransportInfo) (e
 			"-stream_loop", "-1",
 			"-i", b.mediaFile,
 			"-map", "0:a:0",
-			"-acodec", "copy",
+			"-acodec", "libopus", "-ab", "128k", "-ac", "2", "-ar", "48000",
 			"-map", "0:v:0",
 			"-vcodec", "copy",
 		}
