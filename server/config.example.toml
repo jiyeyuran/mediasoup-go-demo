@@ -1,0 +1,17 @@
+[https]
+ListenIp = "0.0.0.0"
+listenPort = 4443
+
+[https.tls]
+cert = "./certs/fullchain.pem"
+key = "./certs/privkey.key"
+
+[mediasoup]
+numWorkers = 1
+
+[mediasoup.webRtcTransportOptions]
+listenIps = [{ip = "127.0.0.1", announcedIp = "127.0.0.1"}]
+
+[mediasoup.plainTransportOptions.listenIp]
+ip = "127.0.0.1"
+announcedIp = "127.0.0.1"
