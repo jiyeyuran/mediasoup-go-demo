@@ -236,14 +236,14 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			joinedPeers = append(joinedPeers, peer)
 		}
 
+		peerInfos := []*proto.PeerInfo{}
+
 		r.broadcasters.Range(func(key, val interface{}) bool {
-			peer := val.(*protoo.Peer)
-			joinedPeers = append(joinedPeers, peer)
+			peerInfo := val.(*proto.PeerInfo)
+			peerInfos = append(peerInfos, peerInfo)
 
 			return true
 		})
-
-		peerInfos := []*proto.PeerInfo{}
 
 		for _, joinedPeer := range joinedPeers {
 			if joinedPeer.Id() == peer.Id() {
