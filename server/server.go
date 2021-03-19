@@ -263,7 +263,7 @@ func (s *Server) Run() {
 	})
 
 	// serve web
-	r.Static("/web", "./public")
+	r.StaticFS("/web", http.FS(Dir("./public")))
 
 	pprof.Register(r)
 

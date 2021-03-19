@@ -1,6 +1,6 @@
 module github.com/jiyeyuran/mediasoup-demo
 
-go 1.15
+go 1.16
 
 require (
 	github.com/gin-contrib/cors v1.3.1
