@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -132,7 +133,7 @@ func (b *Broadcaster) createBroadcaster() (err error) {
 
 	request := proto.PeerInfo{
 		Id:          b.broadcasterID,
-		DisplayName: "Broadcaster@" + time.Now().Format("15:04:05"),
+		DisplayName: fmt.Sprintf("Broadcaster|%s@%s", time.Now().Format("15:04:05"), GetOutboundIP()),
 		Device: proto.DeviceInfo{
 			Flag: "broadcaster",
 			Name: "FFmpeg",
@@ -312,4 +313,17 @@ func (b *Broadcaster) request(method string, url string, data interface{}) (resu
 	}
 
 	return
+}
+
+// Get preferred outbound ip of this machine
+func GetOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }
