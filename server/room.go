@@ -236,14 +236,14 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			joinedPeers = append(joinedPeers, peer)
 		}
 
-		peerInfos := []*proto.PeerInfo{}
-
 		r.broadcasters.Range(func(key, val interface{}) bool {
 			peerInfo := val.(*proto.PeerInfo)
-			peerInfos = append(peerInfos, peerInfo)
+			joinedPeers = append(joinedPeers, protoo.NewPeer(peerInfo.Id, peerInfo.Data, nil))
 
 			return true
 		})
+
+		peerInfos := []*proto.PeerInfo{}
 
 		for _, joinedPeer := range joinedPeers {
 			if joinedPeer.Id() == peer.Id() {
@@ -267,14 +267,14 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 				r.createConsumer(peer, joinedPeer.Id(), producer)
 			}
 
-			// 	// Create DataConsumers for existing DataProducers.
+			// Create DataConsumers for existing DataProducers.
 			for _, dataProducer := range data.DataProducers() {
-				r.createDataConsumer(peer, joinedPeer, dataProducer)
+				r.createDataConsumer(peer, joinedPeer.Id(), dataProducer)
 			}
 		}
 
 		// Create DataConsumers for bot DataProducer.
-		r.createDataConsumer(peer, nil, r.bot.dataProducer)
+		r.createDataConsumer(peer, "", r.bot.dataProducer)
 
 		// // Notify the new Peer to all other Peers.
 		for _, otherPeer := range r.getJoinedPeers(peer) {
@@ -704,7 +704,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		case "chat":
 			// Create a server-side DataConsumer for each Peer.
 			for _, otherPeer := range r.getJoinedPeers(peer) {
-				r.createDataConsumer(otherPeer, peer, dataProducer)
+				r.createDataConsumer(otherPeer, peer.Id(), dataProducer)
 			}
 
 		case "bot":
@@ -986,7 +986,7 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	}()
 }
 
-func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Peer, dataProducer *mediasoup.DataProducer) {
+func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPeerId string, dataProducer *mediasoup.DataProducer) {
 	dataConsumerPeerData := dataConsumerPeer.Data().(*proto.PeerData)
 
 	// NOTE: Don't create the DataConsumer if the remote Peer cannot consume it.
@@ -1034,18 +1034,11 @@ func (r *Room) createDataConsumer(dataConsumerPeer, dataProducerPeer *protoo.Pee
 		})
 	})
 
-	var peerId *string
-
-	if dataProducerPeer != nil {
-		id := dataProducerPeer.Id()
-		peerId = &id
-	}
-
 	go func() {
 		// Send a protoo request to the remote Peer with Consumer parameters.
 		rsp := dataConsumerPeer.Request("newDataConsumer", H{
 			// This is null for bot DataProducer.
-			"peerId":               peerId,
+			"peerId":               dataProducerPeerId,
 			"dataProducerId":       dataProducer.Id(),
 			"id":                   dataConsumer.Id(),
 			"sctpStreamParameters": dataConsumer.SctpStreamParameters(),
