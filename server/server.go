@@ -280,16 +280,6 @@ func (s *Server) getRoom(c *gin.Context) *Room {
 	return room.(*Room)
 }
 
-func (s *Server) getMediasoupWorker() *mediasoup.Worker {
-	worker := s.mediasoupWorkers[s.nextMediasoupWorkerIdx]
-
-	if s.nextMediasoupWorkerIdx == len(s.mediasoupWorkers) {
-		s.nextMediasoupWorkerIdx = 0
-	}
-
-	return worker
-}
-
 func (s *Server) getOrCreateRoom(roomId string) (room *Room, err error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
@@ -299,7 +289,9 @@ func (s *Server) getOrCreateRoom(roomId string) (room *Room, err error) {
 		return val.(*Room), nil
 	}
 
-	room, err = CreateRoom(s.config, roomId, s.getMediasoupWorker())
+	worker := s.mediasoupWorkers[s.nextMediasoupWorkerIdx]
+
+	room, err = CreateRoom(s.config, roomId, worker)
 	if err != nil {
 		return
 	}
@@ -309,6 +301,8 @@ func (s *Server) getOrCreateRoom(roomId string) (room *Room, err error) {
 	room.On("close", func() {
 		s.rooms.Delete(roomId)
 	})
+
+	s.nextMediasoupWorkerIdx = (s.nextMediasoupWorkerIdx + 1) % len(s.mediasoupWorkers)
 
 	return
 }
