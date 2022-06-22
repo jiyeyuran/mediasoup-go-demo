@@ -38,6 +38,11 @@ func NewServer(config Config) *Server {
 	workers := []*mediasoup.Worker{}
 	logger := NewLogger("Server")
 
+	// mediasoup.WorkerBin = "your mediasoup-worker path"
+
+	// you should setup the right mediasoup-worker version!!!
+	// mediasoup.WorkerVersion = "your mediasoup-worker version"
+
 	for i := 0; i < config.Mediasoup.NumWorkers; i++ {
 		worker, err := mediasoup.NewWorker(
 			mediasoup.WithLogLevel(config.Mediasoup.WorkerSettings.LogLevel),
