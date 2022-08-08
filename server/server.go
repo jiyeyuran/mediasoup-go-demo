@@ -11,6 +11,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zerologr"
 	"github.com/gorilla/websocket"
 	"github.com/jiyeyuran/go-protoo/transport"
 	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
@@ -38,6 +40,10 @@ func NewServer(config Config) *Server {
 	workers := []*mediasoup.Worker{}
 	logger := NewLogger("Server")
 
+	mediasoup.NewLogger = func(scope string) logr.Logger {
+		zl := NewLogger(scope)
+		return zerologr.New(&zl)
+	}
 	// mediasoup.WorkerBin = "your mediasoup-worker path"
 
 	// you should setup the right mediasoup-worker version!!!
