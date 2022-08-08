@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jiyeyuran/go-eventemitter"
 	"github.com/jiyeyuran/go-protoo"
 	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
 	"github.com/jiyeyuran/mediasoup-go"
@@ -16,7 +15,7 @@ import (
 )
 
 type Room struct {
-	eventemitter.IEventEmitter
+	mediasoup.IEventEmitter
 	logger             zerolog.Logger
 	peerLockers        sync.Map
 	config             Config
@@ -55,7 +54,7 @@ func CreateRoom(config Config, roomId string, worker *mediasoup.Worker) (room *R
 	}
 
 	room = &Room{
-		IEventEmitter:      eventemitter.NewEventEmitter(),
+		IEventEmitter:      mediasoup.NewEventEmitter(),
 		logger:             logger,
 		config:             config,
 		roomId:             roomId,
