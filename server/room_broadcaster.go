@@ -233,7 +233,7 @@ func (r *Room) CreateBroadcasterProducer(request proto.CreateBroadcasterProducer
 	// Store it.
 	broadcaster.Data.AddProducer(producer)
 
-	producer.On("videoorientationchange", func(videoOrientation mediasoup.ProducerVideoOrientation) {
+	producer.OnVideoOrientationChange(func(videoOrientation *mediasoup.ProducerVideoOrientation) {
 		r.logger.Debug().
 			Str("producerId", producer.Id()).
 			Interface("videoOrientation", videoOrientation).
@@ -291,15 +291,10 @@ func (r *Room) CreateBroadcasterConsumer(request proto.CreateBroadcasterConsumer
 	broadcaster.Data.AddConsumer(consumer)
 
 	// Set Consumer events.
-	consumer.On("transportclose", func() {
+	consumer.OnClose(func() {
 		// Remove from its map.
 		broadcaster.Data.DeleteConsumer(consumer.Id())
 	})
-	consumer.On("producerclose", func() {
-		// Remove from its map.
-		broadcaster.Data.DeleteConsumer(consumer.Id())
-	})
-
 	rsp = proto.CreateBroadcasterConsumerResponse{
 		Id:            consumer.Id(),
 		ProducerId:    request.ProducerId,
@@ -345,11 +340,7 @@ func (r *Room) CreateBroadcasterDataConsumer(request proto.CreateBroadcasterData
 	broadcaster.Data.AddDataConsumer(dataConsumer)
 
 	// Set Consumer events.
-	dataConsumer.On("transportclose", func() {
-		// Remove from its map.
-		broadcaster.Data.DeleteDataConsumer(dataConsumer.Id())
-	})
-	dataConsumer.On("dataproducerclose", func() {
+	dataConsumer.OnClose(func() {
 		// Remove from its map.
 		broadcaster.Data.DeleteDataConsumer(dataConsumer.Id())
 	})

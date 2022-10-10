@@ -54,7 +54,7 @@ func (b *Bot) HandlePeerDataProducer(dataProducerId string, peer *protoo.Peer) (
 		b.logger.Err(err).Msg("consume data")
 		return
 	}
-	dataConsumer.On("message", func(message []byte, ppid byte) {
+	dataConsumer.OnMessage(func(message []byte, ppid int) {
 		if ppid != 51 {
 			b.logger.Warn().Msg("ignoring non string messagee from a Peer")
 			return

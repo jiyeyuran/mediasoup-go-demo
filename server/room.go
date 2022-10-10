@@ -22,7 +22,7 @@ type Room struct {
 	roomId             string
 	protooRoom         *protoo.Room
 	mediasoupRouter    *mediasoup.Router
-	audioLevelObserver mediasoup.IRtpObserver
+	audioLevelObserver *mediasoup.AudioLevelObserver
 	bot                *Bot
 	networkThrottled   bool
 	broadcasters       sync.Map
@@ -176,7 +176,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 }
 
 func (r *Room) handleAudioLevelObserver() {
-	r.audioLevelObserver.On("volumes", func(volumes []mediasoup.AudioLevelObserverVolume) {
+	r.audioLevelObserver.OnVolumes(func(volumes []mediasoup.AudioLevelObserverVolume) {
 		producer := volumes[0].Producer
 		volume := volumes[0].Volume
 
@@ -192,7 +192,7 @@ func (r *Room) handleAudioLevelObserver() {
 		}
 	})
 
-	r.audioLevelObserver.On("silence", func() {
+	r.audioLevelObserver.OnSilence(func() {
 		r.logger.Debug().Msg(`audioLevelObserver "silence" event`)
 
 		for _, peer := range r.getJoinedPeers() {
@@ -319,10 +319,10 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			if err != nil {
 				return err
 			}
-			transport.On("sctpstatechange", func(sctpState mediasoup.SctpState) {
+			transport.OnSctpStateChange(func(sctpState mediasoup.SctpState) {
 				r.logger.Debug().Str("sctpState", string(sctpState)).Msg(`WebRtcTransport "sctpstatechange" event`)
 			})
-			transport.On("dtlsstatechange", func(dtlsState mediasoup.DtlsState) {
+			transport.OnDtlsStateChange(func(dtlsState mediasoup.DtlsState) {
 				if dtlsState == "failed" || dtlsState == "closed" {
 					r.logger.Warn().Str("dtlsState", string(dtlsState)).Msg(`WebRtcTransport "dtlsstatechange" event`)
 				}
@@ -334,7 +334,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 				return err
 			}
 
-			transport.On("trace", func(trace mediasoup.TransportTraceEventData) {
+			transport.OnTrace(func(trace *mediasoup.TransportTraceEventData) {
 				r.logger.Debug().
 					Str("transportId", transport.Id()).
 					Str("trace.type", string(trace.Type)).
@@ -440,7 +440,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		// Store the Producer into the protoo Peer data Object.
 		peerData.AddProducer(producer)
 
-		producer.On("score", func(score []mediasoup.ProducerScore) {
+		producer.OnScore(func(score []mediasoup.ProducerScore) {
 			r.logger.Debug().Str("producerId", producer.Id()).Interface("score", score).Msg(`producer "score" event`)
 
 			peer.Notify("producerScore", H{
@@ -448,7 +448,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 				"score":      score,
 			})
 		})
-		producer.On("videoorientationchange", func(videoOrientation mediasoup.ProducerVideoOrientation) {
+		producer.OnVideoOrientationChange(func(videoOrientation *mediasoup.ProducerVideoOrientation) {
 			r.logger.Debug().
 				Str("producerId", producer.Id()).
 				Interface("videoOrientation", videoOrientation).
@@ -460,7 +460,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		// producer.EnableTraceEvent("pli", "fir");
 		// producer.EnableTraceEvent("keyframe");
 
-		producer.On("trace", func(trace mediasoup.ProducerTraceEventData) {
+		producer.OnTrace(func(trace *mediasoup.ProducerTraceEventData) {
 			r.logger.Debug().
 				Str("producerId", producer.Id()).
 				Str("trace.type", string(trace.Type)).
@@ -899,28 +899,28 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	consumerPeerData.AddConsumer(consumer)
 
 	// Set Consumer events.
-	consumer.On("transportclose", func() {
+	consumer.OnTransportClose(func() {
 		// Remove from its map.
 		consumerPeerData.DeleteConsumer(consumer.Id())
 	})
-	consumer.On("producerclose", func() {
+	consumer.OnProducerClose(func() {
 		// Remove from its map.
 		consumerPeerData.DeleteConsumer(consumer.Id())
 		consumerPeer.Notify("consumerClosed", H{
 			"consumerId": consumer.Id(),
 		})
 	})
-	consumer.On("producerpause", func() {
+	consumer.OnProducerPause(func() {
 		consumerPeer.Notify("consumerPaused", H{
 			"consumerId": consumer.Id(),
 		})
 	})
-	consumer.On("producerresume", func() {
+	consumer.OnProducerResume(func() {
 		consumerPeer.Notify("consumerResumed", H{
 			"consumerId": consumer.Id(),
 		})
 	})
-	consumer.On("score", func(score mediasoup.ConsumerScore) {
+	consumer.OnScore(func(score *mediasoup.ConsumerScore) {
 		r.logger.Debug().
 			Str("consumerId", consumer.Id()).
 			Interface("score", score).Msg(`consumer "score" event`)
@@ -930,7 +930,7 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 			"score":      score,
 		})
 	})
-	consumer.On("layerschange", func(layers mediasoup.ConsumerLayers) {
+	consumer.OnLayersChange(func(layers *mediasoup.ConsumerLayers) {
 		notifyData := H{
 			"consumerId": consumer.Id(),
 		}
@@ -944,7 +944,7 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	// consumer.EnableTraceEvent("pli", "fir");
 	// consumer.EnableTraceEvent("keyframe");
 
-	consumer.On("trace", func(trace mediasoup.ConsumerTraceEventData) {
+	consumer.OnTrace(func(trace *mediasoup.ConsumerTraceEventData) {
 		r.logger.Debug().
 			Str("consumerId", consumer.Id()).
 			Str("trace.type", string(trace.Type)).
@@ -1021,11 +1021,11 @@ func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPee
 	dataConsumerPeerData.AddDataConsumer(dataConsumer)
 
 	// Set DataConsumer events.
-	dataConsumer.On("transportclose", func() {
+	dataConsumer.OnTransportClose(func() {
 		// Remove from its map.
 		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
 	})
-	dataConsumer.On("dataproducerclose", func() {
+	dataConsumer.OnDataProducerClose(func() {
 		// Remove from its map.
 		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
 		dataConsumerPeer.Notify("dataConsumerClosed", H{
