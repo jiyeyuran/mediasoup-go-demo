@@ -2070,7 +2070,9 @@ export default class RoomClient {
 		logger.debug('_joinRoom()');
 
 		try {
-			this._mediasoupDevice = new mediasoupClient.Device({
+			logger.debug('_joinRoom() | using mediasoupClient.Device.factory()');
+
+			this._mediasoupDevice = await mediasoupClient.Device.factory({
 				handlerName: this._handlerName,
 			});
 
