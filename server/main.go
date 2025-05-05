@@ -2,41 +2,27 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
-	"strings"
-
-	"github.com/rs/zerolog"
-	"github.com/spf13/viper"
+	"os"
 )
 
+var configFile = flag.String("config", "config.json", "config file")
+
 func main() {
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-
-	viper.SetConfigName("config")
-	viper.AddConfigPath("/etc/mediasoup-demo/")
-	viper.AddConfigPath(".")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
-
-	config := DefaultConfig
-	logger := NewLogger("Main")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			panic(fmt.Errorf("Fatal error read config file: %s\n", err))
+	config := NewDefaultConfig()
+	if _, err := os.Stat(*configFile); err == nil {
+		data, err := os.ReadFile(*configFile)
+		if err != nil {
+			panic(err)
 		}
-	} else {
-		logger.Info().Str("file", viper.ConfigFileUsed()).Msg("config file used")
-
-		if err := viper.Unmarshal(&config); err != nil {
-			panic(fmt.Errorf("Fatal error unmarshal config file: %s\n", err))
+		if err := json.Unmarshal(data, config); err != nil {
+			panic(err)
 		}
 	}
-
 	data, _ := json.MarshalIndent(config, "", "  ")
 
 	fmt.Printf("config:\n%s\n", data)
-	// logger.Info().Interface("config", config).Send()
 
 	server := NewServer(config)
 	server.Run()

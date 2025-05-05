@@ -3,7 +3,7 @@ package proto
 import (
 	"sync"
 
-	"github.com/jiyeyuran/mediasoup-go"
+	"github.com/jiyeyuran/mediasoup-go/v2"
 )
 
 type PeerInfo struct {
@@ -19,7 +19,7 @@ func (p PeerInfo) CreatePeerData() *PeerData {
 		DisplayName:     p.DisplayName,
 		Device:          p.Device,
 		RtpCapabilities: p.RtpCapabilities,
-		transports:      make(map[string]mediasoup.ITransport),
+		transports:      make(map[string]*mediasoup.Transport),
 		producers:       make(map[string]*mediasoup.Producer),
 		consumers:       make(map[string]*mediasoup.Consumer),
 		dataProducers:   make(map[string]*mediasoup.DataProducer),
@@ -44,7 +44,7 @@ type PeerData struct {
 
 	// // Have mediasoup related maps ready even before the Peer joins since we
 	// // allow creating Transports before joining.
-	transports    map[string]mediasoup.ITransport
+	transports    map[string]*mediasoup.Transport
 	producers     map[string]*mediasoup.Producer
 	consumers     map[string]*mediasoup.Consumer
 	dataProducers map[string]*mediasoup.DataProducer
@@ -53,7 +53,7 @@ type PeerData struct {
 
 func NewPeerData() *PeerData {
 	return &PeerData{
-		transports:    make(map[string]mediasoup.ITransport),
+		transports:    make(map[string]*mediasoup.Transport),
 		producers:     make(map[string]*mediasoup.Producer),
 		consumers:     make(map[string]*mediasoup.Consumer),
 		dataProducers: make(map[string]*mediasoup.DataProducer),
@@ -61,11 +61,11 @@ func NewPeerData() *PeerData {
 	}
 }
 
-func (p *PeerData) Transports() map[string]mediasoup.ITransport {
+func (p *PeerData) Transports() map[string]*mediasoup.Transport {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 
-	newTransports := make(map[string]mediasoup.ITransport)
+	newTransports := make(map[string]*mediasoup.Transport)
 
 	for id, transport := range p.transports {
 		newTransports[id] = transport
@@ -126,14 +126,14 @@ func (p *PeerData) DataConsumers() map[string]*mediasoup.DataConsumer {
 	return newDataConsumers
 }
 
-func (p *PeerData) GetTransport(id string) mediasoup.ITransport {
+func (p *PeerData) GetTransport(id string) *mediasoup.Transport {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 
 	return p.transports[id]
 }
 
-func (p *PeerData) AddTransport(transport mediasoup.ITransport) {
+func (p *PeerData) AddTransport(transport *mediasoup.Transport) {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 

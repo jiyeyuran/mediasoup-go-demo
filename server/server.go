@@ -3,21 +3,20 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zerologr"
 	"github.com/gorilla/websocket"
 	"github.com/jiyeyuran/go-protoo/transport"
 	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
-	"github.com/jiyeyuran/mediasoup-go"
-	"github.com/rs/zerolog"
+	mediasoup "github.com/jiyeyuran/mediasoup-go/v2"
 )
 
 var upgrader = &websocket.Upgrader{
@@ -28,45 +27,41 @@ var upgrader = &websocket.Upgrader{
 }
 
 type Server struct {
-	logger                 zerolog.Logger
+	logger                 *slog.Logger
 	locker                 sync.Mutex
-	config                 Config
+	config                 *Config
 	rooms                  sync.Map
 	mediasoupWorkers       []*mediasoup.Worker
 	nextMediasoupWorkerIdx int
 }
 
-func NewServer(config Config) *Server {
+func NewServer(config *Config) *Server {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.SourceKey {
+				source := a.Value.Any().(*slog.Source)
+				source.File = filepath.Base(source.File)
+			}
+			return a
+		},
+	}))
+
+	workerBin := os.Getenv("MEDIASOUP_WORKER_BIN")
 	workers := []*mediasoup.Worker{}
-	logger := NewLogger("Server")
-
-	mediasoup.NewLogger = func(scope string) logr.Logger {
-		zl := NewLogger(scope)
-		return zerologr.New(&zl)
-	}
-	// mediasoup.WorkerBin = "your mediasoup-worker path"
-
-	// you should setup the right mediasoup-worker version!!!
-	// mediasoup.WorkerVersion = "your mediasoup-worker version"
 
 	for i := 0; i < config.Mediasoup.NumWorkers; i++ {
-		worker, err := mediasoup.NewWorker(
-			mediasoup.WithLogLevel(config.Mediasoup.WorkerSettings.LogLevel),
-			mediasoup.WithLogTags(config.Mediasoup.WorkerSettings.LogTags),
-			mediasoup.WithRtcMinPort(config.Mediasoup.WorkerSettings.RtcMinPort),
-			mediasoup.WithRtcMaxPort(config.Mediasoup.WorkerSettings.RtcMaxPort),
-		)
+		worker, err := mediasoup.NewWorker(workerBin, func(options *mediasoup.WorkerSettings) {
+			*options = *config.Mediasoup.WorkerSettings
+		})
 		if err != nil {
 			panic(err)
 		}
 
-		worker.On("died", func(err error) {
-			logger.Err(err).Msg("mediasoup Worker died, exiting in 2 seconds...")
-			time.AfterFunc(2*time.Second, func() {
-				os.Exit(1)
-			})
+		worker.OnClose(func() {
+			logger.Info("mediasoup Worker closed")
 		})
-
 		workers = append(workers, worker)
 
 		go func() {
@@ -76,10 +71,10 @@ func NewServer(config Config) *Server {
 				case <-ticker.C:
 					usage, err := worker.GetResourceUsage()
 					if err != nil {
-						logger.Err(err).Int("pid", worker.Pid()).Msg("mediasoup Worker resource usage")
+						logger.Error("mediasoup Worker getResourceUsage", "pid", worker.Pid(), "error", err)
 						continue
 					}
-					logger.Info().Int("pid", worker.Pid()).Interface("usage", usage).Msg("mediasoup Worker resource usage")
+					logger.Info("mediasoup Worker resource usage", "pid", worker.Pid(), "usage", usage)
 				}
 			}
 		}()
@@ -273,9 +268,6 @@ func (s *Server) Run() {
 		c.JSON(200, rsp)
 	})
 
-	// serve web
-	r.StaticFS("/web", http.FS(Dir("./public")))
-
 	pprof.Register(r)
 
 	// setup websocket
@@ -302,14 +294,14 @@ func (s *Server) getOrCreateRoom(roomId string) (room *Room, err error) {
 
 	worker := s.mediasoupWorkers[s.nextMediasoupWorkerIdx]
 
-	room, err = CreateRoom(s.config, roomId, worker)
+	room, err = CreateRoom(s.config, roomId, worker, s.logger)
 	if err != nil {
 		return
 	}
 
 	s.rooms.Store(roomId, room)
 
-	room.On("close", func() {
+	room.OnClose(func() {
 		s.rooms.Delete(roomId)
 	})
 
@@ -333,16 +325,12 @@ func (s *Server) runProtooWebSocketServer(c *gin.Context) {
 		return
 	}
 
-	s.logger.Info().
-		Str("roomId", roomId).
-		Str("peerId", peerId).
-		Str("address", c.ClientIP()).
-		Str("origin", c.GetHeader("Origin")).
-		Msg("protoo connection request")
+	s.logger.Info("protoo connection request",
+		"roomId", roomId, "peerId", peerId, "address", c.ClientIP(), "origin", c.GetHeader("Origin"))
 
 	room, err := s.getOrCreateRoom(roomId)
 	if err != nil {
-		s.logger.Err(err).Msg("getOrCreateRoom")
+		s.logger.Error("getOrCreateRoom", "error", err)
 		c.AbortWithError(500, err)
 		return
 	}
@@ -351,6 +339,6 @@ func (s *Server) runProtooWebSocketServer(c *gin.Context) {
 	room.HandleProtooConnection(peerId, transport)
 
 	if err := transport.Run(); err != nil {
-		s.logger.Err(err).Msg("transport.run")
+		s.logger.Error("transport.run", "error", err)
 	}
 }

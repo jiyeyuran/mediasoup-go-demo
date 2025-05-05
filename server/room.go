@@ -4,62 +4,59 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/jiyeyuran/go-protoo"
 	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
-	"github.com/jiyeyuran/mediasoup-go"
-	"github.com/rs/zerolog"
+	"github.com/jiyeyuran/mediasoup-go/v2"
 )
 
 type Room struct {
-	mediasoup.IEventEmitter
-	logger             zerolog.Logger
+	baseNotifier
+	logger             *slog.Logger
 	peerLockers        sync.Map
-	config             Config
+	config             *Config
 	roomId             string
 	protooRoom         *protoo.Room
-	mediasoupRouter    *mediasoup.Router
-	audioLevelObserver *mediasoup.AudioLevelObserver
+	router             *mediasoup.Router
+	audioLevelObserver *mediasoup.RtpObserver
 	bot                *Bot
 	networkThrottled   bool
 	broadcasters       sync.Map
 	closed             uint32
 }
 
-func CreateRoom(config Config, roomId string, worker *mediasoup.Worker) (room *Room, err error) {
-	logger := NewLogger("Room")
-
-	mediasoupRouter, err := worker.CreateRouter(config.Mediasoup.RouterOptions)
+func CreateRoom(config *Config, roomId string, worker *mediasoup.Worker, logger *slog.Logger) (room *Room, err error) {
+	router, err := worker.CreateRouter(config.Mediasoup.RouterOptions)
 	if err != nil {
-		logger.Err(err).Msg("create router")
+		logger.Error("create router", "error", err)
 		return
 	}
 
-	audioLevelObserver, err := mediasoupRouter.CreateAudioLevelObserver(func(o *mediasoup.AudioLevelObserverOptions) {
+	audioLevelObserver, err := router.CreateAudioLevelObserver(func(o *mediasoup.AudioLevelObserverOptions) {
 		o.MaxEntries = 1
 		o.Threshold = -80
 		o.Interval = 800
 	})
 	if err != nil {
-		logger.Err(err).Msg("create audio level observer")
+		logger.Error("create audio level observer", "error", err)
 		return
 	}
 
-	bot, err := CreateBot(mediasoupRouter)
+	bot, err := CreateBot(router, logger)
 	if err != nil {
 		return
 	}
 
 	room = &Room{
-		IEventEmitter:      mediasoup.NewEventEmitter(),
 		logger:             logger,
 		config:             config,
 		roomId:             roomId,
 		protooRoom:         protoo.NewRoom(),
-		mediasoupRouter:    mediasoupRouter,
+		router:             router,
 		audioLevelObserver: audioLevelObserver,
 		bot:                bot,
 	}
@@ -70,14 +67,13 @@ func CreateRoom(config Config, roomId string, worker *mediasoup.Worker) (room *R
 
 func (r *Room) Close() {
 	if atomic.CompareAndSwapUint32(&r.closed, 0, 1) {
-		r.logger.Debug().Msg("close()")
+		r.logger.Debug("close()")
 
 		r.protooRoom.Close()
-		r.mediasoupRouter.Close()
+		r.router.Close()
 		r.bot.Close()
 
-		r.SafeEmit("close")
-		r.RemoveAllListeners()
+		r.notifyClosed()
 
 		if r.networkThrottled {
 			//TODO: throttle stop
@@ -90,37 +86,30 @@ func (r *Room) Closed() bool {
 }
 
 func (r *Room) LogStatus() {
-	dump, err := r.mediasoupRouter.Dump()
+	dump, err := r.router.Dump()
 	if err != nil {
-		r.logger.Err(err).Msg("LogStatus()")
+		r.logger.Error("LogStatus()", "error", err)
 		return
 	}
 
-	r.logger.Info().
-		Str("roomId", r.roomId).
-		Int("peers", len(r.getJoinedPeers())).
-		Int("transports", len(dump.TransportIds)).
-		Msg("logStatus()")
+	r.logger.Info("logStatus()", "roomId", r.roomId, "peers", len(r.getJoinedPeers()), "transports", len(dump.TransportIds))
 }
 
-func (r *Room) GetRouterRtpCapabilities() mediasoup.RtpCapabilities {
-	return r.mediasoupRouter.RtpCapabilities()
+func (r *Room) GetRouterRtpCapabilities() *mediasoup.RtpCapabilities {
+	return r.router.RtpCapabilities()
 }
 
 func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport) (err error) {
 	existingPeer := r.protooRoom.GetPeer(peerId)
 	if existingPeer != nil {
-		r.logger.Warn().
-			Str("peerId", peerId).
-			Msg("handleProtooConnection() | there is already a protoo Peer with same peerId, closing it")
-
+		r.logger.Warn("handleProtooConnection() | there is already a protoo Peer with same peerId, closing it", "peerId", peerId)
 		existingPeer.Close()
 	}
 
 	peerData := proto.NewPeerData()
 	peer, err := r.protooRoom.CreatePeer(peerId, peerData, transport)
 	if err != nil {
-		r.logger.Err(err).Msg("protooRoom.createPeer() failed")
+		r.logger.Error("protooRoom.createPeer() failed", "error", err)
 		return
 	}
 
@@ -132,7 +121,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 		if r.Closed() {
 			return
 		}
-		r.logger.Debug().Str("peerId", peer.Id()).Msg(`protoo Peer "close" event`)
+		r.logger.Debug(`protoo Peer "close" event`, "peerId", peer.Id())
 
 		data := peer.Data().(*proto.PeerData)
 
@@ -153,7 +142,7 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 
 		// If this is the latest Peer in the room, close the room.
 		if len(r.protooRoom.Peers()) == 0 {
-			r.logger.Info().Str("roomId", r.roomId).Msg(`last Peer in the room left, closing the room`)
+			r.logger.Info("last Peer in the room left, closing the room", "roomId", r.roomId)
 			r.Close()
 		}
 
@@ -163,8 +152,8 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 		})
 	})
 
-	peer.On("request", func(request protoo.Message, accept func(data interface{}), reject func(err error)) {
-		r.logger.Debug().Str("method", request.Method).Str("peerId", peerId).Msg(`protoo Peer "request" event`)
+	peer.On("request", func(request protoo.Message, accept func(data any), reject func(err error)) {
+		r.logger.Debug(`protoo Peer "request" event`, "method", request.Method, "peerId", peerId)
 
 		err := r.handleProtooRequest(peer, request, accept)
 		if err != nil {
@@ -176,34 +165,32 @@ func (r *Room) HandleProtooConnection(peerId string, transport protoo.Transport)
 }
 
 func (r *Room) handleAudioLevelObserver() {
-	r.audioLevelObserver.OnVolumes(func(volumes []mediasoup.AudioLevelObserverVolume) {
+	r.audioLevelObserver.OnVolume(func(volumes []mediasoup.AudioLevelObserverVolume) {
 		producer := volumes[0].Producer
 		volume := volumes[0].Volume
 
-		r.logger.Debug().
-			Str("producerId", producer.Id()).Int("volume", volume).
-			Msg(`audioLevelObserver "volumes" event`)
+		r.logger.Debug(`audioLevelObserver "volumes" event`, "producerId", producer.Id(), "volume", volume)
 
 		for _, peer := range r.getJoinedPeers() {
-			peer.Notify("activeSpeaker", map[string]interface{}{
-				"peerId": producer.AppData().(H)["peerId"],
+			peer.Notify("activeSpeaker", map[string]any{
+				"peerId": producer.AppData()["peerId"],
 				"volume": volume,
 			})
 		}
 	})
 
 	r.audioLevelObserver.OnSilence(func() {
-		r.logger.Debug().Msg(`audioLevelObserver "silence" event`)
+		r.logger.Info(`audioLevelObserver "silence" event`)
 
 		for _, peer := range r.getJoinedPeers() {
-			peer.Notify("activeSpeaker", map[string]interface{}{
+			peer.Notify("activeSpeaker", map[string]any{
 				"peerId": nil,
 			})
 		}
 	})
 }
 
-func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, accept func(data interface{})) (err error) {
+func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, accept func(data any)) (err error) {
 	peerData := peer.Data().(*proto.PeerData)
 
 	switch request.Method {
@@ -235,7 +222,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			joinedPeers = append(joinedPeers, peer)
 		}
 
-		r.broadcasters.Range(func(key, val interface{}) bool {
+		r.broadcasters.Range(func(key, val any) bool {
 			peerInfo := val.(*proto.PeerInfo)
 			joinedPeers = append(joinedPeers, protoo.NewPeer(peerInfo.Id, peerInfo.Data, nil))
 
@@ -296,50 +283,46 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 				return
 			}
 
-			webRtcTransportOptions := mediasoup.WebRtcTransportOptions{}
-			Clone(&webRtcTransportOptions, r.config.Mediasoup.WebRtcTransportOptions)
+			webRtcTransportOptions := &mediasoup.WebRtcTransportOptions{
+				AppData: mediasoup.H{
+					"producing": requestData.Producing,
+					"consuming": requestData.Consuming,
+				},
+			}
+			Clone(webRtcTransportOptions, r.config.Mediasoup.WebRtcTransportOptions)
 
-			webRtcTransportOptions.EnableSctp = requestData.SctpCapabilities != nil
+			webRtcTransportOptions.EnableSctp = true
 
 			if requestData.SctpCapabilities != nil {
-				webRtcTransportOptions.NumSctpStreams = requestData.SctpCapabilities.NumStreams
-			}
-
-			webRtcTransportOptions.AppData = &proto.TransportData{
-				Producing: requestData.Producing,
-				Consuming: requestData.Consuming,
+				webRtcTransportOptions.NumSctpStreams = &requestData.SctpCapabilities.NumStreams
 			}
 
 			if requestData.ForceTcp {
-				webRtcTransportOptions.EnableUdp = NewBool(false)
+				webRtcTransportOptions.EnableUdp = Ref(false)
 				webRtcTransportOptions.EnableTcp = true
 			}
 
-			transport, err := r.mediasoupRouter.CreateWebRtcTransport(webRtcTransportOptions)
+			transport, err := r.router.CreateWebRtcTransport(webRtcTransportOptions)
 			if err != nil {
 				return err
 			}
 			transport.OnSctpStateChange(func(sctpState mediasoup.SctpState) {
-				r.logger.Debug().Str("sctpState", string(sctpState)).Msg(`WebRtcTransport "sctpstatechange" event`)
+				r.logger.Debug(`WebRtcTransport "sctpstatechange" event`, "sctpState", sctpState)
 			})
 			transport.OnDtlsStateChange(func(dtlsState mediasoup.DtlsState) {
 				if dtlsState == "failed" || dtlsState == "closed" {
-					r.logger.Warn().Str("dtlsState", string(dtlsState)).Msg(`WebRtcTransport "dtlsstatechange" event`)
+					r.logger.Warn(`Closing WebRtcTransport due to "dtlsstatechange" event`, "dtlsState", dtlsState)
 				}
 			})
 
 			// NOTE: For testing.
 			// transport.EnableTraceEvent("probation", "bwe")
-			if err = transport.EnableTraceEvent("bwe"); err != nil {
+			if err = transport.EnableTraceEvent([]mediasoup.TransportTraceEventType{mediasoup.TransportTraceEventBWE}); err != nil {
 				return err
 			}
 
 			transport.OnTrace(func(trace *mediasoup.TransportTraceEventData) {
-				r.logger.Debug().
-					Str("transportId", transport.Id()).
-					Str("trace.type", string(trace.Type)).
-					Interface("trace", trace).
-					Msg(`"transport "trace" event`)
+				r.logger.Debug(`"transport "trace" event`, "transportId", transport.Id(), "trace.type", trace.Type, "trace", trace)
 
 				if trace.Type == "bwe" && trace.Direction == "out" {
 					peer.Notify("downlinkBwe", trace.Info)
@@ -349,12 +332,14 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			// Store the WebRtcTransport into the protoo Peer data Object.
 			peerData.AddTransport(transport)
 
+			data := transport.Data().WebRtcTransportData
+
 			accept(H{
 				"id":             transport.Id(),
-				"iceParameters":  transport.IceParameters(),
-				"iceCandidates":  transport.IceCandidates(),
-				"dtlsParameters": transport.DtlsParameters(),
-				"sctpParameters": transport.SctpParameters(),
+				"iceParameters":  data.IceParameters,
+				"iceCandidates":  data.IceCandidates,
+				"dtlsParameters": data.DtlsParameters,
+				"sctpParameters": data.SctpParameters,
 			})
 
 			maxIncomingBitrate := r.config.Mediasoup.WebRtcTransportOptions.MaxIncomingBitrate
@@ -377,7 +362,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
-		transport.Connect(mediasoup.TransportConnectOptions{
+		transport.Connect(&mediasoup.TransportConnectOptions{
 			DtlsParameters: requestData.DtlsParameters,
 		})
 		accept(nil)
@@ -394,7 +379,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
-		iceParameters, err := transport.(*mediasoup.WebRtcTransport).RestartIce()
+		iceParameters, err := transport.RestartIce()
 		if err != nil {
 			return err
 		}
@@ -407,10 +392,10 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			return
 		}
 		var requestData struct {
-			TransportId   string                  `json:"transportId,omitempty"`
-			Kind          mediasoup.MediaKind     `json:"kind,omitempty"`
-			RtpParameters mediasoup.RtpParameters `json:"rtpParameters,omitempty"`
-			AppData       H                       `json:"appData,omitempty"`
+			TransportId   string                   `json:"transportId,omitempty"`
+			Kind          mediasoup.MediaKind      `json:"kind,omitempty"`
+			RtpParameters *mediasoup.RtpParameters `json:"rtpParameters,omitempty"`
+			AppData       H                        `json:"appData,omitempty"`
 		}
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
@@ -428,7 +413,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		}
 		appData["peerId"] = peer.Id()
 
-		producer, err := transport.Produce(mediasoup.ProducerOptions{
+		producer, err := transport.Produce(&mediasoup.ProducerOptions{
 			Kind:          requestData.Kind,
 			RtpParameters: requestData.RtpParameters,
 			AppData:       appData,
@@ -441,18 +426,15 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		peerData.AddProducer(producer)
 
 		producer.OnScore(func(score []mediasoup.ProducerScore) {
-			r.logger.Debug().Str("producerId", producer.Id()).Interface("score", score).Msg(`producer "score" event`)
+			r.logger.Debug(`producer "score" event`, "producerId", producer.Id(), "score", score)
 
 			peer.Notify("producerScore", H{
 				"producerId": producer.Id(),
 				"score":      score,
 			})
 		})
-		producer.OnVideoOrientationChange(func(videoOrientation *mediasoup.ProducerVideoOrientation) {
-			r.logger.Debug().
-				Str("producerId", producer.Id()).
-				Interface("videoOrientation", videoOrientation).
-				Msg(`producer "videoorientationchange" event`)
+		producer.OnVideoOrientationChange(func(videoOrientation mediasoup.ProducerVideoOrientation) {
+			r.logger.Debug("producer video orientation change", "producerId", producer.Id(), "videoOrientation", videoOrientation)
 		})
 
 		// NOTE: For testing.
@@ -460,12 +442,8 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		// producer.EnableTraceEvent("pli", "fir");
 		// producer.EnableTraceEvent("keyframe");
 
-		producer.OnTrace(func(trace *mediasoup.ProducerTraceEventData) {
-			r.logger.Debug().
-				Str("producerId", producer.Id()).
-				Str("trace.type", string(trace.Type)).
-				Interface("trace", trace).
-				Msg(`producer "trace" event`)
+		producer.OnTrace(func(trace mediasoup.ProducerTraceEventData) {
+			r.logger.Debug(`producer "trace" event`, "producerId", producer.Id(), "trace.type", trace.Type, "trace", trace)
 		})
 
 		accept(H{"id": producer.Id()})
@@ -476,7 +454,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		}
 
 		// // Add into the audioLevelObserver.
-		if producer.Kind() == mediasoup.MediaKind_Audio {
+		if producer.Kind() == mediasoup.MediaKindAudio {
 			r.audioLevelObserver.AddProducer(producer.Id())
 		}
 
@@ -626,7 +604,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		}
 		var requestData struct {
 			ConsumerId string
-			Priority   uint32
+			Priority   byte
 		}
 		if err = json.Unmarshal(request.Data, &requestData); err != nil {
 			return
@@ -686,7 +664,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			err = fmt.Errorf(`transport with id "%s" not found`, requestData.TransportId)
 			return
 		}
-		dataProducer, err := transport.ProduceData(mediasoup.DataProducerOptions{
+		dataProducer, err := transport.ProduceData(&mediasoup.DataProducerOptions{
 			SctpStreamParameters: requestData.SctpStreamParameters,
 			Label:                requestData.Label,
 			Protocol:             requestData.Protocol,
@@ -759,7 +737,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			return err
 		}
 
-		accept(stats)
+		accept([]any{stats})
 
 	case "getProducerStats":
 		var requestData struct {
@@ -865,15 +843,15 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 
 	// NOTE: Don"t create the Consumer if the remote Peer cannot consume it.
 	if consumerPeerData.RtpCapabilities == nil ||
-		!r.mediasoupRouter.CanConsume(producer.Id(), *consumerPeerData.RtpCapabilities) {
+		!r.router.CanConsume(producer.Id(), consumerPeerData.RtpCapabilities) {
 		return
 	}
 
 	// Must take the Transport the remote Peer is using for consuming.
-	var transport mediasoup.ITransport
+	var transport *mediasoup.Transport
 
 	for _, t := range consumerPeerData.Transports() {
-		if data, ok := t.AppData().(*proto.TransportData); ok && data.Consuming {
+		if consuming, ok := t.AppData()["consuming"].(bool); ok && consuming {
 			transport = t
 			break
 		}
@@ -881,17 +859,19 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 
 	// This should not happen.
 	if transport == nil {
-		r.logger.Warn().Msg("createConsumer() | Transport for consuming not found")
+		r.logger.Info("createConsumer() | Transport for consuming not found")
 		return
 	}
 
-	consumer, err := transport.Consume(mediasoup.ConsumerOptions{
+	consumer, err := transport.Consume(&mediasoup.ConsumerOptions{
 		ProducerId:      producer.Id(),
-		RtpCapabilities: *consumerPeerData.RtpCapabilities,
+		RtpCapabilities: consumerPeerData.RtpCapabilities,
 		Paused:          true,
+		EnableRtx:       Ref(true),
+		IgnoreDtx:       true,
 	})
 	if err != nil {
-		r.logger.Err(err).Msg("createConsumer() | transport.consume()")
+		r.logger.Error("createConsumer() | transport.consume()", "error", err)
 		return
 	}
 
@@ -899,13 +879,11 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	consumerPeerData.AddConsumer(consumer)
 
 	// Set Consumer events.
-	consumer.OnTransportClose(func() {
+	consumer.OnClose(func() {
 		// Remove from its map.
 		consumerPeerData.DeleteConsumer(consumer.Id())
 	})
 	consumer.OnProducerClose(func() {
-		// Remove from its map.
-		consumerPeerData.DeleteConsumer(consumer.Id())
 		consumerPeer.Notify("consumerClosed", H{
 			"consumerId": consumer.Id(),
 		})
@@ -920,11 +898,8 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 			"consumerId": consumer.Id(),
 		})
 	})
-	consumer.OnScore(func(score *mediasoup.ConsumerScore) {
-		r.logger.Debug().
-			Str("consumerId", consumer.Id()).
-			Interface("score", score).Msg(`consumer "score" event`)
-
+	consumer.OnScore(func(score mediasoup.ConsumerScore) {
+		r.logger.Debug(`consumer "score" event`, "score", score, "consumerId", consumer.Id())
 		consumerPeer.Notify("consumerScore", H{
 			"consumerId": consumer.Id(),
 			"score":      score,
@@ -932,10 +907,14 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	})
 	consumer.OnLayersChange(func(layers *mediasoup.ConsumerLayers) {
 		notifyData := H{
-			"consumerId": consumer.Id(),
+			"consumerId":    consumer.Id(),
+			"spatialLayer":  nil,
+			"temporalLayer": nil,
 		}
-		notifyData["spatialLayer"] = layers.SpatialLayer
-		notifyData["temporalLayer"] = layers.TemporalLayer
+		if layers != nil {
+			notifyData["spatialLayer"] = layers.SpatialLayer
+			notifyData["temporalLayer"] = layers.TemporalLayer
+		}
 		consumerPeer.Notify("consumerLayersChanged", notifyData)
 	})
 
@@ -944,12 +923,8 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	// consumer.EnableTraceEvent("pli", "fir");
 	// consumer.EnableTraceEvent("keyframe");
 
-	consumer.OnTrace(func(trace *mediasoup.ConsumerTraceEventData) {
-		r.logger.Debug().
-			Str("consumerId", consumer.Id()).
-			Str("trace.type", string(trace.Type)).
-			Interface("trace", trace).
-			Msg(`consumer "trace" event`)
+	consumer.OnTrace(func(trace mediasoup.ConsumerTraceEventData) {
+		r.logger.Debug(`consumer "trace" event`, "trace", trace, "consumerId", consumer.Id(), "type", trace.Type)
 	})
 
 	go func() {
@@ -961,11 +936,11 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 			"kind":           consumer.Kind(),
 			"rtpParameters":  consumer.RtpParameters(),
 			"type":           consumer.Type(),
-			"appData":        consumer.AppData(),
+			"appData":        producer.AppData(),
 			"producerPaused": consumer.ProducerPaused(),
 		})
 		if rsp.Err() != nil {
-			r.logger.Warn().Err(rsp.Err()).Msg("createConsumer() | failed")
+			r.logger.Warn("createConsumer() | failed", "error", rsp.Err())
 			return
 		}
 
@@ -974,7 +949,7 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 		// of this new stream once its PeerConnection is already ready to process
 		// and associate it.
 		if err = consumer.Resume(); err != nil {
-			r.logger.Warn().Err(err).Msg("createConsumer() | failed")
+			r.logger.Warn("createConsumer() | failed", "error", err)
 			return
 		}
 
@@ -994,10 +969,10 @@ func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPee
 	}
 
 	// Must take the Transport the remote Peer is using for consuming.
-	var transport mediasoup.ITransport
+	var transport *mediasoup.Transport
 
 	for _, t := range dataConsumerPeerData.Transports() {
-		if data, ok := t.AppData().(*proto.TransportData); ok && data.Consuming {
+		if consuming, ok := t.AppData()["consuming"].(bool); ok && consuming {
 			transport = t
 			break
 		}
@@ -1005,15 +980,15 @@ func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPee
 
 	// This should not happen.
 	if transport == nil {
-		r.logger.Warn().Msg("createDataConsumer() | Transport for consuming not found")
+		r.logger.Info("createDataConsumer() | Transport for consuming not found")
 		return
 	}
 
-	dataConsumer, err := transport.ConsumeData(mediasoup.DataConsumerOptions{
+	dataConsumer, err := transport.ConsumeData(&mediasoup.DataConsumerOptions{
 		DataProducerId: dataProducer.Id(),
 	})
 	if err != nil {
-		r.logger.Err(err).Msg("createDataConsumer() | transport.consumeData()")
+		r.logger.Error("createDataConsumer() | transport.consumeData()", "error", err)
 		return
 	}
 
@@ -1021,11 +996,7 @@ func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPee
 	dataConsumerPeerData.AddDataConsumer(dataConsumer)
 
 	// Set DataConsumer events.
-	dataConsumer.OnTransportClose(func() {
-		// Remove from its map.
-		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
-	})
-	dataConsumer.OnDataProducerClose(func() {
+	dataConsumer.OnClose(func() {
 		// Remove from its map.
 		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
 		dataConsumerPeer.Notify("dataConsumerClosed", H{
@@ -1043,10 +1014,10 @@ func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPee
 			"sctpStreamParameters": dataConsumer.SctpStreamParameters(),
 			"label":                dataConsumer.Label(),
 			"protocol":             dataConsumer.Protocol(),
-			"appData":              dataConsumer.AppData(),
+			"appData":              dataProducer.AppData(),
 		})
 		if rsp.Err() != nil {
-			r.logger.Warn().Err(rsp.Err()).Msg("createDataConsumer() | failed")
+			r.logger.Warn("createDataConsumer() | failed", "error", rsp.Err())
 		}
 	}()
 }

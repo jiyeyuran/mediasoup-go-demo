@@ -1,0 +1,37 @@
+{
+    "domain": "localhost",
+    "https": {
+        "ListenIp": "0.0.0.0",
+        "listenPort": 4443,
+        "tls": {
+            "cert": "./certs/fullchain.pem",
+            "key": "./certs/privkey.pem"
+        }
+    },
+    "mediasoup": {
+        "numWorkers": 1,
+        "webRtcTransportOptions": {
+            "listenInfos": [
+                {
+                    "protocol": "udp",
+                    "ip": "0.0.0.0",
+                    "announcedAddress": "127.0.0.1",
+                    "portRange": {"min": 40000, "max": 49999}
+                },
+                {
+                    "protocol": "tcp",
+                    "ip": "0.0.0.0",
+                    "announcedAddress": "127.0.0.1",
+                    "portRange": {"min": 40000, "max": 49999}
+                }
+            ]
+        },
+        "plainTransportOptions": {
+            "listenInfo": {
+                "ip": "0.0.0.0",
+                "announcedAddress": "127.0.0.1",
+                "portRange": {"min": 40000, "max": 49999}
+            }
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "https": {
+        "ListenIp": "0.0.0.0",
+        "listenPort": 4443,
+        "tls": {
+            "cert": "./certs/fullchain.pem",
+            "key": "./certs/privkey.pem"
+        }
+    },
+    "mediasoup": {
+        "numWorkers": 1,
+        "webRtcTransportOptions": {
+            "listenInfos": [
+                {
+                    "ip": "127.0.0.1",
+                    "announcedAddress": "127.0.0.1"
+                }
+            ]
+        },
+        "plainTransportOptions": {
+            "listenInfo": {
+                "ip": "127.0.0.1",
+                "announcedAddress": "127.0.0.1"
+            }
+        }
+    }
+}

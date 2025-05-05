@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/jiyeyuran/mediasoup-go"
-	"github.com/jiyeyuran/mediasoup-go/h264"
+	"github.com/jiyeyuran/mediasoup-go/v2"
 )
 
 type Config struct {
@@ -17,7 +16,7 @@ type Config struct {
 }
 
 type HTTPSConfig struct {
-	ListenIp   string    `json:"listenIP,omitempty"`
+	ListenIp   string    `json:"listenIp,omitempty"`
 	ListenPort uint16    `json:"listenPort,omitempty"`
 	TLS        TLSConfig `json:"tls,omitempty"`
 }
@@ -28,92 +27,35 @@ type TLSConfig struct {
 }
 
 type MediasoupConfig struct {
-	NumWorkers             int                             `json:"numWorkers,omitempty"`
-	WorkerSettings         mediasoup.WorkerSettings        `json:"workerSettings,omitempty"`
-	RouterOptions          mediasoup.RouterOptions         `json:"routerOptions,omitempty"`
-	WebRtcTransportOptions WebRtcTransportOptions          `json:"webRtcTransportOptions,omitempty"`
-	PlainTransportOptions  mediasoup.PlainTransportOptions `json:"plainTransportOptions,omitempty"`
+	NumWorkers             int                              `json:"numWorkers,omitempty"`
+	WorkerSettings         *mediasoup.WorkerSettings        `json:"workerSettings,omitempty"`
+	RouterOptions          *mediasoup.RouterOptions         `json:"routerOptions,omitempty"`
+	WebRtcTransportOptions *WebRtcTransportOptions          `json:"webRtcTransportOptions,omitempty"`
+	PlainTransportOptions  *mediasoup.PlainTransportOptions `json:"plainTransportOptions,omitempty"`
 }
 
 type WebRtcTransportOptions struct {
-	/**
-	 * Listening IP address or addresses in order of preference (first one is the
-	 * preferred one).
-	 */
-	ListenIps []mediasoup.TransportListenIp `json:"listenIps,omitempty"`
-
-	/**
-	 * Listen in UDP. Default true.
-	 */
-	EnableUdp *bool `json:"enableUdp,omitempty"`
-
-	/**
-	 * Listen in TCP. Default false.
-	 */
-	EnableTcp bool `json:"enableTcp,omitempty"`
-
-	/**
-	 * Prefer UDP. Default false.
-	 */
-	PreferUdp bool `json:"preferUdp,omitempty"`
-
-	/**
-	 * Prefer TCP. Default false.
-	 */
-	PreferTcp bool `json:"preferTcp,omitempty"`
-
-	/**
-	 * Initial available outgoing bitrate (in bps). Default 600000.
-	 */
-	InitialAvailableOutgoingBitrate uint32 `json:"initialAvailableOutgoingBitrate,omitempty"`
-
-	/**
-	 * Create a SCTP association. Default false.
-	 */
-	EnableSctp bool `json:"enableSctp,omitempty"`
-
-	/**
-	 * SCTP streams uint32.
-	 */
-	NumSctpStreams mediasoup.NumSctpStreams `json:"numSctpStreams,omitempty"`
-
-	/**
-	 * Maximum allowed size for SCTP messages sent by DataProducers.
-	 * Default 262144.
-	 */
-	MaxSctpMessageSize int `json:"maxSctpMessageSize,omitempty"`
-
-	/**
-	 * Maximum SCTP send buffer used by DataConsumers.
-	 * Default 262144.
-	 */
-	SctpSendBufferSize int `json:"sctpSendBufferSize,omitempty"`
-
-	/**
-	 * Custom application data.
-	 */
-	AppData interface{} `json:"appData,omitempty"`
-
-	// Additional options that are not part of WebRtcTransportOptions.
-	MaxIncomingBitrate int `json:"maxIncomingBitrate,omitempty"`
+	mediasoup.WebRtcTransportOptions
+	MaxIncomingBitrate uint32 `json:"maxIncomingBitrate,omitempty"`
 }
 
-var (
-	dirname, _    = filepath.Abs(filepath.Dir(os.Args[0]))
-	DefaultConfig = Config{
+func NewDefaultConfig() *Config {
+	var dirname, _ = filepath.Abs(filepath.Dir(os.Args[0]))
+
+	return &Config{
 		Domain: "localhost",
 		Https: HTTPSConfig{
 			ListenIp:   "0.0.0.0",
 			ListenPort: 4443,
 			TLS: TLSConfig{
 				Cert: filepath.Join(dirname, "certs", "fullchain.pem"),
-				Key:  filepath.Join(dirname, "certs", "privkey.key"),
+				Key:  filepath.Join(dirname, "certs", "privkey.pem"),
 			},
 		},
 		Mediasoup: MediasoupConfig{
 			NumWorkers: runtime.NumCPU(),
-			WorkerSettings: mediasoup.WorkerSettings{
-				LogLevel: "warn",
+			WorkerSettings: &mediasoup.WorkerSettings{
+				LogLevel: mediasoup.WorkerLogLevelWarn,
 				LogTags: []mediasoup.WorkerLogTag{
 					"info",
 					"ice",
@@ -128,19 +70,17 @@ var (
 					"svc",
 					"sctp",
 				},
-				RtcMinPort: 40000,
-				RtcMaxPort: 49999,
 			},
-			RouterOptions: mediasoup.RouterOptions{
+			RouterOptions: &mediasoup.RouterOptions{
 				MediaCodecs: []*mediasoup.RtpCodecCapability{
 					{
-						Kind:      mediasoup.MediaKind_Audio,
+						Kind:      mediasoup.MediaKindAudio,
 						MimeType:  "audio/opus",
 						ClockRate: 48000,
 						Channels:  2,
 					},
 					{
-						Kind:      mediasoup.MediaKind_Video,
+						Kind:      mediasoup.MediaKindVideo,
 						MimeType:  "video/VP8",
 						ClockRate: 90000,
 						Parameters: mediasoup.RtpCodecSpecificParameters{
@@ -148,7 +88,7 @@ var (
 						},
 					},
 					{
-						Kind:      mediasoup.MediaKind_Video,
+						Kind:      mediasoup.MediaKindVideo,
 						MimeType:  "video/VP9",
 						ClockRate: 90000,
 						Parameters: mediasoup.RtpCodecSpecificParameters{
@@ -157,54 +97,50 @@ var (
 						},
 					},
 					{
-						Kind:      mediasoup.MediaKind_Video,
+						Kind:      mediasoup.MediaKindVideo,
 						MimeType:  "video/h264",
 						ClockRate: 90000,
 						Parameters: mediasoup.RtpCodecSpecificParameters{
-							RtpParameter: h264.RtpParameter{
-								PacketizationMode:     1,
-								ProfileLevelId:        "42e01f",
-								LevelAsymmetryAllowed: 1,
-							},
-							XGoogleStartBitrate: 1000,
+							PacketizationMode:     1,
+							ProfileLevelId:        "42e01f",
+							LevelAsymmetryAllowed: 1,
+							XGoogleStartBitrate:   1000,
 						},
 					},
 					{
-						Kind:      mediasoup.MediaKind_Video,
+						Kind:      mediasoup.MediaKindVideo,
 						MimeType:  "video/h264",
 						ClockRate: 90000,
 						Parameters: mediasoup.RtpCodecSpecificParameters{
-							RtpParameter: h264.RtpParameter{
-								PacketizationMode:     1,
-								ProfileLevelId:        "4d0032",
-								LevelAsymmetryAllowed: 1,
-							},
-							XGoogleStartBitrate: 1000,
+							PacketizationMode:     1,
+							ProfileLevelId:        "4d0032",
+							LevelAsymmetryAllowed: 1,
+							XGoogleStartBitrate:   1000,
 						},
 					},
 				},
 			},
-			WebRtcTransportOptions: WebRtcTransportOptions{
-				ListenIps: []mediasoup.TransportListenIp{
-					{
-						Ip:          GetOutboundIP(),
-						AnnouncedIp: GetOutboundIP(),
+			WebRtcTransportOptions: &WebRtcTransportOptions{
+				WebRtcTransportOptions: mediasoup.WebRtcTransportOptions{
+					ListenInfos: []mediasoup.TransportListenInfo{
+						{
+							Ip:               GetOutboundIP(),
+							AnnouncedAddress: GetOutboundIP(),
+						},
 					},
 				},
-				InitialAvailableOutgoingBitrate: 1000000,
-				MaxSctpMessageSize:              262144,
-				MaxIncomingBitrate:              1500000,
+				MaxIncomingBitrate: 1500000,
 			},
-			PlainTransportOptions: mediasoup.PlainTransportOptions{
-				ListenIp: mediasoup.TransportListenIp{
-					Ip:          GetOutboundIP(),
-					AnnouncedIp: GetOutboundIP(),
+			PlainTransportOptions: &mediasoup.PlainTransportOptions{
+				ListenInfo: mediasoup.TransportListenInfo{
+					Ip:               GetOutboundIP(),
+					AnnouncedAddress: GetOutboundIP(),
 				},
 				MaxSctpMessageSize: 262144,
 			},
 		},
 	}
-)
+}
 
 // Get preferred outbound ip of this machine
 func GetOutboundIP() string {

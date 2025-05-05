@@ -4,11 +4,9 @@ import (
 	"errors"
 	"flag"
 	"log"
-	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 type Options struct {
@@ -68,8 +66,6 @@ func main() {
 	if err := opts.Verify(); err != nil {
 		panic(err)
 	}
-
-	rand.Seed(time.Now().UTC().UnixNano())
 
 	broadcaster := NewBroadcaster(opts)
 

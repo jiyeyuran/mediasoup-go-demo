@@ -1,6 +1,6 @@
 package proto
 
-import "github.com/jiyeyuran/mediasoup-go"
+import "github.com/jiyeyuran/mediasoup-go/v2"
 
 type CreateBroadcasterRequest struct {
 	Id              string                    `json:"id,omitempty"`
@@ -33,16 +33,16 @@ type CreateBroadcasterTransportResponse struct {
 }
 
 type ConnectBroadcasterTransportRequest struct {
-	BroadcasterId  string                   `json:"broadcasterId,omitempty"`
-	TransportId    string                   `json:"transportId,omitempty"`
-	DtlsParameters mediasoup.DtlsParameters `json:"dtlsParameters,omitempty"`
+	BroadcasterId  string                    `json:"broadcasterId,omitempty"`
+	TransportId    string                    `json:"transportId,omitempty"`
+	DtlsParameters *mediasoup.DtlsParameters `json:"dtlsParameters,omitempty"`
 }
 
 type CreateBroadcasterProducerRequest struct {
-	BroadcasterId string                  `json:"broadcasterId,omitempty"`
-	TransportId   string                  `json:"transportId,omitempty"`
-	Kind          string                  `json:"kind,omitempty"`
-	RtpParameters mediasoup.RtpParameters `json:"rtpParameters,omitempty"`
+	BroadcasterId string                   `json:"broadcasterId,omitempty"`
+	TransportId   string                   `json:"transportId,omitempty"`
+	Kind          string                   `json:"kind,omitempty"`
+	RtpParameters *mediasoup.RtpParameters `json:"rtpParameters,omitempty"`
 }
 
 type CreateBroadcasterProducerResponse struct {
@@ -56,11 +56,11 @@ type CreateBroadcasterConsumerRequest struct {
 }
 
 type CreateBroadcasterConsumerResponse struct {
-	Id            string                  `json:"id,omitempty"`
-	ProducerId    string                  `json:"producerId,omitempty"`
-	Kind          string                  `json:"kind,omitempty"`
-	RtpParameters mediasoup.RtpParameters `json:"rtpParameters,omitempty"`
-	Type          string                  `json:"type,omitempty"`
+	Id            string                   `json:"id,omitempty"`
+	ProducerId    string                   `json:"producerId,omitempty"`
+	Kind          string                   `json:"kind,omitempty"`
+	RtpParameters *mediasoup.RtpParameters `json:"rtpParameters,omitempty"`
+	Type          string                   `json:"type,omitempty"`
 }
 
 type CreateBroadcasterDataConsumerRequest struct {
@@ -79,7 +79,7 @@ type CreateBroadcasterDataProducerRequest struct {
 	Label                string                          `json:"label,omitempty"`
 	Protocol             string                          `json:"protocol,omitempty"`
 	SctpStreamParameters *mediasoup.SctpStreamParameters `json:"sctpStreamParameters,omitempty"`
-	AppData              interface{}                     `json:"appData,omitempty"`
+	AppData              mediasoup.H                     `json:"appData,omitempty"`
 }
 
 type CreateBroadcasterDataProducerResponse struct {

@@ -2,37 +2,33 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/jiyeyuran/go-protoo"
-	"github.com/jiyeyuran/mediasoup-go"
-	"github.com/rs/zerolog"
+	"github.com/jiyeyuran/mediasoup-go/v2"
 )
 
 type Bot struct {
-	logger       zerolog.Logger
-	transport    *mediasoup.DirectTransport
+	logger       *slog.Logger
+	transport    *mediasoup.Transport
 	dataProducer *mediasoup.DataProducer
 }
 
-func CreateBot(mediasoupRouter *mediasoup.Router) (bot *Bot, err error) {
-	logger := NewLogger("Bot")
-
-	transport, err := mediasoupRouter.CreateDirectTransport(mediasoup.DirectTransportOptions{
+func CreateBot(router *mediasoup.Router, logger *slog.Logger) (bot *Bot, err error) {
+	transport, err := router.CreateDirectTransport(&mediasoup.DirectTransportOptions{
 		MaxMessageSize: 512,
 	})
 	if err != nil {
-		logger.Err(err).Msg("create direct transport")
-		return
+		panic(err)
 	}
-	dataProducer, err := transport.ProduceData(mediasoup.DataProducerOptions{
+	dataProducer, err := transport.ProduceData(&mediasoup.DataProducerOptions{
 		Label: "bot",
 	})
 	if err != nil {
-		logger.Err(err).Msg("produce data")
-		return
+		panic(err)
 	}
 	return &Bot{
-		logger:       NewLogger("Bot"),
+		logger:       logger,
 		transport:    transport,
 		dataProducer: dataProducer,
 	}, nil
@@ -47,21 +43,20 @@ func (b Bot) Close() {
 }
 
 func (b *Bot) HandlePeerDataProducer(dataProducerId string, peer *protoo.Peer) (err error) {
-	dataConsumer, err := b.transport.ConsumeData(mediasoup.DataConsumerOptions{
+	dataConsumer, err := b.transport.ConsumeData(&mediasoup.DataConsumerOptions{
 		DataProducerId: dataProducerId,
 	})
 	if err != nil {
-		b.logger.Err(err).Msg("consume data")
+		b.logger.Error("consume data", "error", err)
 		return
 	}
-	dataConsumer.OnMessage(func(message []byte, ppid int) {
-		if ppid != 51 {
-			b.logger.Warn().Msg("ignoring non string messagee from a Peer")
+	dataConsumer.OnMessage(func(message []byte, ppid mediasoup.SctpPayloadType) {
+		if ppid != mediasoup.SctpPayloadWebRTCString {
+			b.logger.Info("ignoring non string messagee from a Peer")
 			return
 		}
 
-		b.logger.Debug().Str("peerId", peer.Id()).Int("size", len(message)).Msgf("SCTP message received")
-
+		b.logger.Debug("SCTP message received", "peerId", peer.Id(), "size", len(message))
 		// Create a message to send it back to all Peers in behalf of the sending
 		// Peer.
 		messageBack := fmt.Sprintf(`%s said me: "%s"`, peer.Id(), message)

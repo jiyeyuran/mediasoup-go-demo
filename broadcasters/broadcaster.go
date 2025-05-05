@@ -7,20 +7,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log/slog"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
-	"github.com/jiyeyuran/mediasoup-go"
+	"github.com/jiyeyuran/mediasoup-go/v2"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -38,8 +38,8 @@ type Broadcaster struct {
 	videoSsrc     uint32
 	videoPt       uint8
 	httpClient    http.Client
-	logger        zerolog.Logger
-	waitGroup     *sync.WaitGroup
+	logger        *slog.Logger
+	waitGroup     sync.WaitGroup
 }
 
 func NewBroadcaster(opts *Options) *Broadcaster {
@@ -49,6 +49,18 @@ func NewBroadcaster(opts *Options) *Broadcaster {
 	generateSsrc := func() uint32 {
 		return uint32(rand.Int31n(9000000) + 1000000)
 	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.SourceKey {
+				source := a.Value.Any().(*slog.Source)
+				source.File = filepath.Base(source.File)
+			}
+			return a
+		},
+	}))
 
 	return &Broadcaster{
 		context:       context,
@@ -67,11 +79,7 @@ func NewBroadcaster(opts *Options) *Broadcaster {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !opts.VerifyCert},
 			},
 		},
-		logger: zerolog.New(os.Stderr).With().Timestamp().
-			Str("room", opts.RoomID).
-			Str("broadcaster", broadcasterID).
-			Logger().Level(zerolog.InfoLevel),
-		waitGroup: &sync.WaitGroup{},
+		logger: logger,
 	}
 }
 
@@ -106,7 +114,7 @@ func (b *Broadcaster) Run() (err error) {
 		<-b.context.Done()
 
 		if b.context.Err() != context.Canceled {
-			b.logger.Err(b.context.Err()).Msg("ffmpeg failed")
+			b.logger.Error("ffmpeg failed", "error", b.context.Err())
 		}
 	}()
 
@@ -121,7 +129,7 @@ func (b *Broadcaster) Stop() {
 }
 
 func (b *Broadcaster) verifyRoom() (err error) {
-	b.logger.Info().Msg("verifying the room exists...")
+	b.logger.Info("verifying the room exists...")
 
 	_, err = b.request(http.MethodGet, "/rooms/"+b.roomID, nil)
 
@@ -129,7 +137,7 @@ func (b *Broadcaster) verifyRoom() (err error) {
 }
 
 func (b *Broadcaster) createBroadcaster() (err error) {
-	b.logger.Info().Msg("creating Broadcaster...")
+	b.logger.Info("creating Broadcaster...")
 
 	request := proto.PeerInfo{
 		Id:          b.broadcasterID,
@@ -144,14 +152,14 @@ func (b *Broadcaster) createBroadcaster() (err error) {
 }
 
 func (b *Broadcaster) deleteBroadcaster() (err error) {
-	b.logger.Info().Msg("deleting Broadcaster...")
+	b.logger.Info("deleting Broadcaster...")
 
 	_, err = b.request(http.MethodDelete, fmt.Sprintf("/rooms/%s/broadcasters/%s", b.roomID, b.broadcasterID), nil)
 	return
 }
 
 func (b *Broadcaster) createPlainTransport() (resp proto.CreateBroadcasterTransportResponse, err error) {
-	b.logger.Info().Msg("creating mediasoup PlainTransport for producing audio/video...")
+	b.logger.Info("creating mediasoup PlainTransport for producing audio/video...")
 
 	rtcpMux := false
 
@@ -171,11 +179,11 @@ func (b *Broadcaster) createPlainTransport() (resp proto.CreateBroadcasterTransp
 }
 
 func (b *Broadcaster) createAudioProducer(transportID string) (err error) {
-	b.logger.Info().Msg("creating mediasoup audio Producer...")
+	b.logger.Info("creating mediasoup audio Producer...")
 
 	request := proto.CreateBroadcasterProducerRequest{
 		Kind: "audio",
-		RtpParameters: mediasoup.RtpParameters{
+		RtpParameters: &mediasoup.RtpParameters{
 			Codecs: []*mediasoup.RtpCodecParameters{
 				{
 					MimeType:    "audio/opus",
@@ -187,7 +195,7 @@ func (b *Broadcaster) createAudioProducer(transportID string) (err error) {
 					},
 				},
 			},
-			Encodings: []mediasoup.RtpEncodingParameters{
+			Encodings: []*mediasoup.RtpEncodingParameters{
 				{
 					Ssrc: b.audioSsrc,
 				},
@@ -204,11 +212,11 @@ func (b *Broadcaster) createAudioProducer(transportID string) (err error) {
 }
 
 func (b *Broadcaster) createVideoProducer(transportID string) (err error) {
-	b.logger.Info().Msg("creating mediasoup video Producer...")
+	b.logger.Info("creating mediasoup video Producer...")
 
 	request := proto.CreateBroadcasterProducerRequest{
 		Kind: "video",
-		RtpParameters: mediasoup.RtpParameters{
+		RtpParameters: &mediasoup.RtpParameters{
 			Codecs: []*mediasoup.RtpCodecParameters{
 				{
 					MimeType:    "video/vp8",
@@ -216,7 +224,7 @@ func (b *Broadcaster) createVideoProducer(transportID string) (err error) {
 					ClockRate:   90000,
 				},
 			},
-			Encodings: []mediasoup.RtpEncodingParameters{
+			Encodings: []*mediasoup.RtpEncodingParameters{
 				{
 					Ssrc: b.videoSsrc,
 				},
@@ -233,7 +241,7 @@ func (b *Broadcaster) createVideoProducer(transportID string) (err error) {
 }
 
 func (b *Broadcaster) runFFmpeg(audioTransport, videoTransport TransportInfo) (err error) {
-	args := []string{}
+	var args []string
 
 	if strings.HasSuffix(b.mediaFile, ".webm") {
 		args = []string{
@@ -265,7 +273,7 @@ func (b *Broadcaster) runFFmpeg(audioTransport, videoTransport TransportInfo) (e
 		b.videoSsrc, b.videoPt, videoTransport.Ip, videoTransport.Port, videoTransport.RtcpPort,
 	))
 
-	b.logger.Info().Msgf("runing ffmpeg %s", strings.Join(args, " "))
+	b.logger.Info(fmt.Sprintf("runing ffmpeg %s", strings.Join(args, " ")))
 
 	cmd := exec.CommandContext(b.context, "ffmpeg", args...)
 	cmd.Stderr = os.Stderr
@@ -274,7 +282,7 @@ func (b *Broadcaster) runFFmpeg(audioTransport, videoTransport TransportInfo) (e
 	return errors.WithStack(cmd.Run())
 }
 
-func (b *Broadcaster) request(method string, url string, data interface{}) (result []byte, err error) {
+func (b *Broadcaster) request(method string, url string, data any) (result []byte, err error) {
 	var body io.Reader
 
 	if data != nil {
@@ -288,7 +296,7 @@ func (b *Broadcaster) request(method string, url string, data interface{}) (resu
 		return
 	}
 
-	req.WithContext(b.context)
+	req = req.WithContext(b.context)
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
@@ -297,7 +305,7 @@ func (b *Broadcaster) request(method string, url string, data interface{}) (resu
 	}
 	defer resp.Body.Close()
 
-	result, err = ioutil.ReadAll(resp.Body)
+	result, err = io.ReadAll(resp.Body)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -307,8 +315,7 @@ func (b *Broadcaster) request(method string, url string, data interface{}) (resu
 		var errResult struct {
 			Error string
 		}
-		json.Unmarshal(result, &errResult)
-
+		_ = json.Unmarshal(result, &errResult)
 		err = errors.WithStack(errors.New(errResult.Error))
 	}
 

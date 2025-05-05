@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jiyeyuran/mediasoup-demo/internal/proto"
-	"github.com/jiyeyuran/mediasoup-go"
+	"github.com/jiyeyuran/mediasoup-go/v2"
 )
 
 /**
@@ -14,7 +14,7 @@ import (
 func (r *Room) CreateBroadcaster(request proto.PeerInfo) (rsp H, err error) {
 	if _, ok := r.broadcasters.Load(request.Id); ok {
 		err = fmt.Errorf(`broadcaster with id "%s" already exists`, request.Id)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
@@ -58,7 +58,7 @@ func (r *Room) CreateBroadcaster(request proto.PeerInfo) (rsp H, err error) {
 			}
 			for _, producer := range peerData.Producers() {
 				// Ignore Producers that the Broadcaster cannot consume.
-				if r.mediasoupRouter.CanConsume(producer.Id(), *request.RtpCapabilities) {
+				if r.router.CanConsume(producer.Id(), request.RtpCapabilities) {
 					peerInfos = append(peerInfos, peerInfo)
 					peerInfo.Producers = append(peerInfo.Producers, ProducerInfo{
 						Id:   producer.Id(),
@@ -85,7 +85,7 @@ func (r *Room) DeleteBroadcaster(broadcasterId string) (err error) {
 
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, broadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
@@ -110,21 +110,21 @@ func (r *Room) CreateBroadcasterTransport(request proto.CreateBroadcasterTranspo
 	value, ok := r.broadcasters.Load(request.BroadcasterId)
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 	broadcaster := value.(*proto.PeerInfo)
 
 	switch request.Type {
 	case "webrtc":
-		webRtcTransportOptions := mediasoup.WebRtcTransportOptions{}
+		webRtcTransportOptions := &mediasoup.WebRtcTransportOptions{}
 		Clone(&webRtcTransportOptions, r.config.Mediasoup.WebRtcTransportOptions)
 
 		if request.SctpCapabilities != nil {
 			webRtcTransportOptions.EnableSctp = true
-			webRtcTransportOptions.NumSctpStreams = request.SctpCapabilities.NumStreams
+			webRtcTransportOptions.NumSctpStreams = &request.SctpCapabilities.NumStreams
 		}
-		transport, err := r.mediasoupRouter.CreateWebRtcTransport(webRtcTransportOptions)
+		transport, err := r.router.CreateWebRtcTransport(webRtcTransportOptions)
 		if err != nil {
 			return rsp, err
 		}
@@ -132,22 +132,24 @@ func (r *Room) CreateBroadcasterTransport(request proto.CreateBroadcasterTranspo
 		// Store it.
 		broadcaster.Data.AddTransport(transport)
 
+		data := transport.Data().WebRtcTransportData
+
 		rsp = H{
 			"id":             transport.Id(),
-			"iceParameters":  transport.IceParameters(),
-			"iceCandidates":  transport.IceCandidates(),
-			"dtlsParameters": transport.DtlsParameters(),
-			"sctpParameters": transport.SctpParameters(),
+			"iceParameters":  data.IceParameters,
+			"iceCandidates":  data.IceCandidates,
+			"dtlsParameters": data.DtlsParameters,
+			"sctpParameters": data.SctpParameters,
 		}
 
 	case "plain":
-		plainTransportOptions := mediasoup.PlainTransportOptions{}
+		plainTransportOptions := &mediasoup.PlainTransportOptions{}
 		Clone(&plainTransportOptions, r.config.Mediasoup.PlainTransportOptions)
 
 		plainTransportOptions.RtcpMux = request.RtcpMux
 		plainTransportOptions.Comedia = request.Comedia
 
-		transport, err := r.mediasoupRouter.CreatePlainTransport(plainTransportOptions)
+		transport, err := r.router.CreatePlainTransport(plainTransportOptions)
 		if err != nil {
 			return rsp, err
 		}
@@ -155,13 +157,15 @@ func (r *Room) CreateBroadcasterTransport(request proto.CreateBroadcasterTranspo
 		// Store it.
 		broadcaster.Data.AddTransport(transport)
 
+		data := transport.Data().PlainTransportData
+
 		rsp = H{
 			"id":   transport.Id(),
-			"ip":   transport.Tuple().LocalIp,
-			"port": transport.Tuple().LocalPort,
+			"ip":   data.Tuple.LocalAddress,
+			"port": data.Tuple.LocalPort,
 		}
 
-		if rtcpTuple := transport.RtcpTuple(); rtcpTuple != nil {
+		if rtcpTuple := data.RtcpTuple; rtcpTuple != nil {
 			rsp["rtcpPort"] = rtcpTuple.LocalPort
 		}
 	}
@@ -176,7 +180,7 @@ func (r *Room) ConnectBroadcasterTransport(request proto.ConnectBroadcasterTrans
 	value, ok := r.broadcasters.Load(request.BroadcasterId)
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 	broadcaster := value.(*proto.PeerInfo)
@@ -184,19 +188,12 @@ func (r *Room) ConnectBroadcasterTransport(request proto.ConnectBroadcasterTrans
 	transport := broadcaster.Data.GetTransport(request.TransportId)
 	if transport == nil {
 		err = fmt.Errorf(`transport with id "%s" does not exist`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
-	webrtcTransport, ok := transport.(*mediasoup.WebRtcTransport)
-	if !ok {
-		err = fmt.Errorf(`transport with id "%s" is not a WebRtcTransport`, request.BroadcasterId)
-		r.logger.Err(err).Send()
-		return
-	}
-
-	err = webrtcTransport.Connect(mediasoup.TransportConnectOptions{
-		DtlsParameters: &request.DtlsParameters,
+	err = transport.Connect(&mediasoup.TransportConnectOptions{
+		DtlsParameters: request.DtlsParameters,
 	})
 
 	return
@@ -209,7 +206,7 @@ func (r *Room) CreateBroadcasterProducer(request proto.CreateBroadcasterProducer
 	value, ok := r.broadcasters.Load(request.BroadcasterId)
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 	broadcaster := value.(*proto.PeerInfo)
@@ -217,27 +214,25 @@ func (r *Room) CreateBroadcasterProducer(request proto.CreateBroadcasterProducer
 	transport := broadcaster.Data.GetTransport(request.TransportId)
 	if transport == nil {
 		err = fmt.Errorf(`transport with id "%s" does not exist`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
-	producer, err := transport.Produce(mediasoup.ProducerOptions{
+	producer, err := transport.Produce(&mediasoup.ProducerOptions{
 		Kind:          mediasoup.MediaKind(request.Kind),
 		RtpParameters: request.RtpParameters,
 	})
 	if err != nil {
-		r.logger.Err(err).Str("broadcaster", request.BroadcasterId).Msg("create producer failed")
+		r.logger.Error("create producer failed", "broadcaster", request.BroadcasterId, "error", err)
 		return
 	}
 
 	// Store it.
 	broadcaster.Data.AddProducer(producer)
 
-	producer.OnVideoOrientationChange(func(videoOrientation *mediasoup.ProducerVideoOrientation) {
-		r.logger.Debug().
-			Str("producerId", producer.Id()).
-			Interface("videoOrientation", videoOrientation).
-			Msg(`broadcaster producer "videoorientationchange" event`)
+	producer.OnVideoOrientationChange(func(videoOrientation mediasoup.ProducerVideoOrientation) {
+		r.logger.Debug(`broadcaster producer "videoorientationchange" event`,
+			"producerId", producer.Id(), "videoOrientation", videoOrientation)
 	})
 
 	// Optimization: Create a server-side Consumer for each Peer.
@@ -246,7 +241,7 @@ func (r *Room) CreateBroadcasterProducer(request proto.CreateBroadcasterProducer
 	}
 
 	// Add into the audioLevelObserver.
-	if producer.Kind() == mediasoup.MediaKind_Audio {
+	if producer.Kind() == mediasoup.MediaKindAudio {
 		r.audioLevelObserver.AddProducer(producer.Id())
 	}
 
@@ -260,30 +255,30 @@ func (r *Room) CreateBroadcasterConsumer(request proto.CreateBroadcasterConsumer
 	value, ok := r.broadcasters.Load(request.BroadcasterId)
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 	broadcaster := value.(*proto.PeerInfo)
 
 	if broadcaster.Data.RtpCapabilities == nil {
 		err = errors.New("broadcaster does not have rtpCapabilities")
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
 	transport := broadcaster.Data.GetTransport(request.TransportId)
 	if transport == nil {
 		err = fmt.Errorf(`transport with id "%s" does not exist`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
-	consumer, err := transport.Consume(mediasoup.ConsumerOptions{
+	consumer, err := transport.Consume(&mediasoup.ConsumerOptions{
 		ProducerId:      request.ProducerId,
-		RtpCapabilities: *broadcaster.Data.RtpCapabilities,
+		RtpCapabilities: broadcaster.Data.RtpCapabilities,
 	})
 	if err != nil {
-		r.logger.Err(err).Str("broadcaster", request.BroadcasterId).Msg("create consumer failed")
+		r.logger.Error("create consumer failed", "broadcaster", request.BroadcasterId, "error", err)
 		return
 	}
 
@@ -310,29 +305,29 @@ func (r *Room) CreateBroadcasterDataConsumer(request proto.CreateBroadcasterData
 	value, ok := r.broadcasters.Load(request.BroadcasterId)
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 	broadcaster := value.(*proto.PeerInfo)
 
 	if broadcaster.Data.RtpCapabilities == nil {
 		err = errors.New("broadcaster does not have rtpCapabilities")
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
 	transport := broadcaster.Data.GetTransport(request.TransportId)
 	if transport == nil {
 		err = fmt.Errorf(`transport with id "%s" does not exist`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
-	dataConsumer, err := transport.ConsumeData(mediasoup.DataConsumerOptions{
+	dataConsumer, err := transport.ConsumeData(&mediasoup.DataConsumerOptions{
 		DataProducerId: request.DataProducerId,
 	})
 	if err != nil {
-		r.logger.Err(err).Str("broadcaster", request.BroadcasterId).Msg("create data consumer failed")
+		r.logger.Error("create data consumer failed", "broadcaster", request.BroadcasterId, "error", err)
 		return
 	}
 
@@ -356,7 +351,7 @@ func (r *Room) CreateBroadcasterDataProducer(request proto.CreateBroadcasterData
 	value, ok := r.broadcasters.Load(request.BroadcasterId)
 	if !ok {
 		err = fmt.Errorf(`broadcaster with id "%s" does not exists`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 	broadcaster := value.(*proto.PeerInfo)
@@ -364,26 +359,24 @@ func (r *Room) CreateBroadcasterDataProducer(request proto.CreateBroadcasterData
 	transport := broadcaster.Data.GetTransport(request.TransportId)
 	if transport == nil {
 		err = fmt.Errorf(`transport with id "%s" does not exist`, request.BroadcasterId)
-		r.logger.Err(err).Send()
+		r.logger.Error(err.Error())
 		return
 	}
 
-	dataProducer, err := transport.ProduceData(mediasoup.DataProducerOptions{
+	dataProducer, err := transport.ProduceData(&mediasoup.DataProducerOptions{
 		SctpStreamParameters: request.SctpStreamParameters,
 		Label:                request.Label,
 		Protocol:             request.Protocol,
 		AppData:              request.AppData,
 	})
 	if err != nil {
-		r.logger.Err(err).Str("broadcaster", request.BroadcasterId).Msg("create producer failed")
+		r.logger.Error("create producer failed", "broadcaster", request.BroadcasterId, "error", err)
 		return
 	}
 
 	// Store it.
 	broadcaster.Data.AddDataProducer(dataProducer)
-
-	dataProducer.On("transportclose", func() {
-		// Remove from its map.
+	dataProducer.OnClose(func() {
 		broadcaster.Data.DeleteDataProducer(dataProducer.Id())
 	})
 
