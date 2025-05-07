@@ -92,7 +92,7 @@ func NewDefaultConfig() *Config {
 						MimeType:  "video/VP9",
 						ClockRate: 90000,
 						Parameters: mediasoup.RtpCodecSpecificParameters{
-							ProfileId:           "2",
+							ProfileId:           2,
 							XGoogleStartBitrate: 1000,
 						},
 					},

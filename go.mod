@@ -10,7 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/gorilla/websocket v1.4.2
 	github.com/jiyeyuran/go-protoo v1.0.7
-	github.com/jiyeyuran/mediasoup-go/v2 v2.0.0-rc.3
+	github.com/jiyeyuran/mediasoup-go/v2 v2.0.0-rc.4
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 )
