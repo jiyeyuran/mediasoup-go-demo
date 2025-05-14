@@ -16,6 +16,7 @@ By adding query parameters into the URL you can set certain settings of the appl
 | `produce`          | Boolean | Enable sending of audio/video | `true`  |
 | `consume`          | Boolean | Enable reception of audio/video | `true` |
 | `datachannel`      | Boolean | Enable DataChannels | `true` |
+| `preferLocalCodecsOrder` | Boolean | Prefer the codecs order of the browser instead of the codecs order configured in the server | `false` |
 | `forceVP8`        | Boolean | Force VP8 codec for webcam and screen sharing | `false` |
 | `forceH264`        | Boolean | Force H264 codec for webcam and screen sharing | `false` |
 | `forceVP9`        | Boolean | Force VP9 codec for webcam and screen sharing | `false` |

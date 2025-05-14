@@ -68,6 +68,8 @@ async function run() {
 	const produce = urlParser.query.produce !== 'false';
 	const consume = urlParser.query.consume !== 'false';
 	const datachannel = urlParser.query.datachannel !== 'false';
+	const preferLocalCodecsOrder =
+		urlParser.query.preferLocalCodecsOrder === 'true';
 	const forceVP8 = urlParser.query.forceVP8 === 'true';
 	const forceH264 = urlParser.query.forceH264 === 'true';
 	const forceVP9 = urlParser.query.forceVP9 === 'true';
@@ -120,6 +122,7 @@ async function run() {
 			case 'produce':
 			case 'consume':
 			case 'datachannel':
+			case 'preferLocalCodecsOrder':
 			case 'forceVP8':
 			case 'forceH264':
 			case 'forceVP9':
@@ -180,6 +183,7 @@ async function run() {
 		produce,
 		consume,
 		datachannel,
+		preferLocalCodecsOrder,
 		forceVP8,
 		forceH264,
 		forceVP9,

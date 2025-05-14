@@ -47,6 +47,7 @@ export default class RoomClient {
 		webcamScalabilityMode,
 		sharingScalabilityMode,
 		numSimulcastStreams,
+		preferLocalCodecsOrder,
 		forceVP8,
 		forceH264,
 		forceVP9,
@@ -95,6 +96,11 @@ export default class RoomClient {
 		// Whether we want DataChannels.
 		// @type {Boolean}
 		this._useDataChannel = Boolean(datachannel);
+
+		// Prefer the codecs order of the browser instead of the codecs order
+		// configured in the server.
+		// @type {Boolean}
+		this._preferLocalCodecsOrder = Boolean(preferLocalCodecsOrder);
 
 		// Force VP8 codec for sending.
 		// @type {Boolean}
@@ -2086,7 +2092,10 @@ export default class RoomClient {
 				'getRouterRtpCapabilities'
 			);
 
-			await this._mediasoupDevice.load({ routerRtpCapabilities });
+			await this._mediasoupDevice.load({
+				routerRtpCapabilities,
+				preferLocalCodecsOrder: this._preferLocalCodecsOrder,
+			});
 
 			// NOTE: Stuff to play remote audios due to browsers' new autoplay policy.
 			//
