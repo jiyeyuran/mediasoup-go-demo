@@ -25,7 +25,7 @@ try {
   // ignore file not found
 }
 
-const port = Number(process.env.VITE_LISTEN_PORT) || 3000;
+const port = Number(process.env.VITE_LISTEN_PORT) || 5555;
 const https = cert && key ? { cert, key } : undefined;
 const alias: { [k: string]: string } = {};
 
