@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,10 +37,10 @@ func CreateRoom(config *Config, roomId string, worker *mediasoup.Worker, logger 
 		return
 	}
 
-	audioLevelObserver, err := router.CreateAudioLevelObserver(func(o *mediasoup.AudioLevelObserverOptions) {
-		o.MaxEntries = 1
-		o.Threshold = -80
-		o.Interval = 800
+	audioLevelObserver, err := router.CreateAudioLevelObserver(&mediasoup.AudioLevelObserverOptions{
+		MaxEntries: 1,
+		Threshold:  -80,
+		Interval:   800,
 	})
 	if err != nil {
 		logger.Error("create audio level observer", "error", err)
@@ -391,6 +392,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			err = errors.New("Peer not yet joined")
 			return
 		}
+		r.logger.Info("produce", "data", string(request.Data))
 		var requestData struct {
 			TransportId   string                   `json:"transportId,omitempty"`
 			Kind          mediasoup.MediaKind      `json:"kind,omitempty"`
@@ -425,8 +427,12 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		// Store the Producer into the protoo Peer data Object.
 		peerData.AddProducer(producer)
 
+		data, _ := json.Marshal(producer.ConsumableRtpParameters())
+
+		r.logger.Info("producer created", "producerId", producer.Id(), "kind", producer.Kind(), "rtpParameters", string(data), "appData", producer.AppData())
+
 		producer.OnScore(func(score []mediasoup.ProducerScore) {
-			r.logger.Debug(`producer "score" event`, "producerId", producer.Id(), "score", score)
+			r.logger.Info(`producer "score" event`, "producerId", producer.Id(), "score", score)
 
 			peer.Notify("producerScore", H{
 				"producerId": producer.Id(),
@@ -879,21 +885,21 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	consumerPeerData.AddConsumer(consumer)
 
 	// Set Consumer events.
-	consumer.OnClose(func() {
+	consumer.OnClose(func(ctx context.Context) {
 		// Remove from its map.
 		consumerPeerData.DeleteConsumer(consumer.Id())
 	})
-	consumer.OnProducerClose(func() {
+	consumer.OnProducerClose(func(ctx context.Context) {
 		consumerPeer.Notify("consumerClosed", H{
 			"consumerId": consumer.Id(),
 		})
 	})
-	consumer.OnProducerPause(func() {
+	consumer.OnProducerPause(func(ctx context.Context) {
 		consumerPeer.Notify("consumerPaused", H{
 			"consumerId": consumer.Id(),
 		})
 	})
-	consumer.OnProducerResume(func() {
+	consumer.OnProducerResume(func(ctx context.Context) {
 		consumerPeer.Notify("consumerResumed", H{
 			"consumerId": consumer.Id(),
 		})
@@ -996,7 +1002,7 @@ func (r *Room) createDataConsumer(dataConsumerPeer *protoo.Peer, dataProducerPee
 	dataConsumerPeerData.AddDataConsumer(dataConsumer)
 
 	// Set DataConsumer events.
-	dataConsumer.OnClose(func() {
+	dataConsumer.OnClose(func(ctx context.Context) {
 		// Remove from its map.
 		dataConsumerPeerData.DeleteDataConsumer(dataConsumer.Id())
 		dataConsumerPeer.Notify("dataConsumerClosed", H{

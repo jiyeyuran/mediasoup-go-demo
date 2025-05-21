@@ -10,7 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/gorilla/websocket v1.4.2
 	github.com/jiyeyuran/go-protoo v1.0.7
-	github.com/jiyeyuran/mediasoup-go/v2 v2.0.0-rc.4
+	github.com/jiyeyuran/mediasoup-go/v2 v2.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 )
@@ -35,7 +35,7 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/ugorji/go/codec v1.1.7 // indirect
-	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect

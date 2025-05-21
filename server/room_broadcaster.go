@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -286,7 +287,7 @@ func (r *Room) CreateBroadcasterConsumer(request proto.CreateBroadcasterConsumer
 	broadcaster.Data.AddConsumer(consumer)
 
 	// Set Consumer events.
-	consumer.OnClose(func() {
+	consumer.OnClose(func(ctx context.Context) {
 		// Remove from its map.
 		broadcaster.Data.DeleteConsumer(consumer.Id())
 	})
@@ -335,7 +336,7 @@ func (r *Room) CreateBroadcasterDataConsumer(request proto.CreateBroadcasterData
 	broadcaster.Data.AddDataConsumer(dataConsumer)
 
 	// Set Consumer events.
-	dataConsumer.OnClose(func() {
+	dataConsumer.OnClose(func(ctx context.Context) {
 		// Remove from its map.
 		broadcaster.Data.DeleteDataConsumer(dataConsumer.Id())
 	})
@@ -376,7 +377,7 @@ func (r *Room) CreateBroadcasterDataProducer(request proto.CreateBroadcasterData
 
 	// Store it.
 	broadcaster.Data.AddDataProducer(dataProducer)
-	dataProducer.OnClose(func() {
+	dataProducer.OnClose(func(ctx context.Context) {
 		broadcaster.Data.DeleteDataProducer(dataProducer.Id())
 	})
 

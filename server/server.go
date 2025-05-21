@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -59,7 +60,7 @@ func NewServer(config *Config) *Server {
 			panic(err)
 		}
 
-		worker.OnClose(func() {
+		worker.OnClose(func(ctx context.Context) {
 			logger.Info("mediasoup Worker closed")
 		})
 		workers = append(workers, worker)

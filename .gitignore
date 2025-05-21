@@ -14,7 +14,7 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-config.toml
+config.json
 broadcasters/broadcasters
 server/server
 certs/

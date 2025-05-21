@@ -44,8 +44,8 @@ github.com/jiyeyuran/go-eventemitter v1.4.2 h1:dz6rEVqknw2RAT83+/XLEWcOj4sZ6/GvQ
 github.com/jiyeyuran/go-eventemitter v1.4.2/go.mod h1:8l80Tzn7/W5Hzo6VkOhkB5gNpPTiBC/RnxB2CkhVWVY=
 github.com/jiyeyuran/go-protoo v1.0.7 h1:5YNUdYCe7QuhFilxcPu6RhGLyJwoyQFSDzdo5fR5cn0=
 github.com/jiyeyuran/go-protoo v1.0.7/go.mod h1:u8eggJTx/35mXQdCBhqoNtXHjcGVRYhzVd7oh4F6ptE=
-github.com/jiyeyuran/mediasoup-go/v2 v2.0.0-rc.4 h1:SmHy8ktFURBFJCqvayJ2SL6fb+KcMPHQ9B/tTMFPC+4=
-github.com/jiyeyuran/mediasoup-go/v2 v2.0.0-rc.4/go.mod h1:EjVP5KPYmdrB7bIiA58eg6chzEv/pvY82DeNLmOjB7c=
+github.com/jiyeyuran/mediasoup-go/v2 v2.0.0 h1:oZMlG/Stip5NkRt4MVOxnEw0sCX9AOC8HwQSalMkMhE=
+github.com/jiyeyuran/mediasoup-go/v2 v2.0.0/go.mod h1:EjVP5KPYmdrB7bIiA58eg6chzEv/pvY82DeNLmOjB7c=
 github.com/json-iterator/go v1.1.7/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/json-iterator/go v1.1.9 h1:9yzud/Ht36ygwatGx56VwCZtlI/2AD15T1X2sjSuGns=
 github.com/json-iterator/go v1.1.9/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
@@ -121,8 +121,8 @@ golang.org/x/net v0.0.0-20210226172049-e18ecbb05110/go.mod h1:m0MpNAwzfU5UDzcl9v
 golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-golang.org/x/sync v0.13.0 h1:AauUjRAJ9OSnvULf/ARrrVywoJDy0YS2AwQ98I37610=
-golang.org/x/sync v0.13.0/go.mod h1:1dzgHSNfp02xaA81J2MS99Qcpr2w7fw1gpm99rleRqA=
+golang.org/x/sync v0.11.0 h1:GGz8+XQP4FvTTrjZPzNKTMFtSXH80RAzG+5ghFPgK9w=
+golang.org/x/sync v0.11.0/go.mod h1:Czt+wKu1gCyEFDUtn0jG5QVvpJ6rzVqr5aXyt9drQfk=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
