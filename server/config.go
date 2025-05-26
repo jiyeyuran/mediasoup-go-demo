@@ -129,7 +129,7 @@ func NewDefaultConfig() *Config {
 						},
 					},
 				},
-				MaxIncomingBitrate: 5000000,
+				MaxIncomingBitrate: 6500000,
 			},
 			PlainTransportOptions: &mediasoup.PlainTransportOptions{
 				ListenInfo: mediasoup.TransportListenInfo{
