@@ -86,6 +86,7 @@ async function run() {
 	const externalVideo = urlParser.query.externalVideo === 'true';
 	const throttleSecret = urlParser.query.throttleSecret;
 	const e2eKey = urlParser.query.e2eKey;
+	const autoConnect = urlParser.query.autoConnect === 'true';
 	const consumerReplicas = urlParser.query.consumerReplicas;
 
 	// Enable face detection on demand.
@@ -137,6 +138,7 @@ async function run() {
 			case 'externalVideo':
 			case 'throttleSecret':
 			case 'e2eKey':
+			case 'autoConnect':
 			case 'consumerReplicas': {
 				break;
 			}
@@ -195,6 +197,7 @@ async function run() {
 		numSimulcastStreams,
 		externalVideo,
 		e2eKey,
+		autoConnect,
 		consumerReplicas,
 	});
 

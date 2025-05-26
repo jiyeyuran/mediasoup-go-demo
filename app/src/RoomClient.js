@@ -54,6 +54,7 @@ export default class RoomClient {
 		forceAV1,
 		externalVideo,
 		e2eKey,
+		autoConnect,
 		consumerReplicas,
 	}) {
 		logger.debug(
@@ -231,6 +232,10 @@ export default class RoomClient {
 		if (this._e2eKey && e2e.isSupported()) {
 			e2e.setCryptoKey('setCryptoKey', this._e2eKey, true);
 		}
+
+		// Whether to automatically connect webrtc transport.
+		// @type {Boolean}
+		this._autoConnect = Boolean(autoConnect);
 	}
 
 	close() {
@@ -255,6 +260,18 @@ export default class RoomClient {
 		store.dispatch(
 			stateActions.setMediasoupClientVersion(mediasoupClient.version)
 		);
+
+		if (this._autoConnect) {
+			this._cert = await RTCPeerConnection.generateCertificate({
+				name: 'ECDSA',
+				namedCurve: 'P-256'
+			});
+			const fingerprints = await this._cert.getFingerprints();
+			this._dtlsFingerprints = fingerprints.map(f => ({
+				algorithm: f.algorithm,
+				value: f.value.toUpperCase()
+			}));
+		}
 
 		const protooTransport = new protooClient.WebSocketTransport(
 			this._protooUrl
@@ -2122,6 +2139,7 @@ export default class RoomClient {
 						sctpCapabilities: this._useDataChannel
 							? this._mediasoupDevice.sctpCapabilities
 							: undefined,
+						DTLSFingerprints: this._dtlsFingerprints,
 					}
 				);
 
@@ -2149,6 +2167,7 @@ export default class RoomClient {
 					proprietaryConstraints: PC_PROPRIETARY_CONSTRAINTS,
 					additionalSettings: {
 						encodedInsertableStreams: this._e2eKey && e2e.isSupported(),
+						certificates: this._cert ? [this._cert] : undefined,
 					},
 				});
 
@@ -2159,6 +2178,11 @@ export default class RoomClient {
 						callback,
 						errback // eslint-disable-line no-shadow
 					) => {
+						if (this._cert) {
+							// If we are using a certificate, we don't need to connect webrtc transport.
+							callback();
+							return;
+						}
 						this._protoo
 							.request('connectWebRtcTransport', {
 								transportId: this._sendTransport.id,
@@ -2231,6 +2255,7 @@ export default class RoomClient {
 						sctpCapabilities: this._useDataChannel
 							? this._mediasoupDevice.sctpCapabilities
 							: undefined,
+						DTLSFingerprints: this._dtlsFingerprints,
 					}
 				);
 
@@ -2257,6 +2282,7 @@ export default class RoomClient {
 					iceServers: [],
 					additionalSettings: {
 						encodedInsertableStreams: this._e2eKey && e2e.isSupported(),
+						certificates: this._cert ? [this._cert] : undefined,
 					},
 				});
 
@@ -2267,6 +2293,11 @@ export default class RoomClient {
 						callback,
 						errback // eslint-disable-line no-shadow
 					) => {
+						if (this._cert) {
+							// If we are using a certificate, we don't need to connect webrtc transport.
+							callback();
+							return;
+						}
 						this._protoo
 							.request('connectWebRtcTransport', {
 								transportId: this._recvTransport.id,

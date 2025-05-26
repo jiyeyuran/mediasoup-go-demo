@@ -279,6 +279,7 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 				Producing        bool
 				Consuming        bool
 				SctpCapabilities *mediasoup.SctpCapabilities
+				DTLSFingerprints []mediasoup.DtlsFingerprint
 			}
 			if err = json.Unmarshal(request.Data, &requestData); err != nil {
 				return
@@ -306,6 +307,18 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 			transport, err := r.router.CreateWebRtcTransport(webRtcTransportOptions)
 			if err != nil {
 				return err
+			}
+			if len(requestData.DTLSFingerprints) > 0 {
+				err = transport.Connect(&mediasoup.TransportConnectOptions{
+					DtlsParameters: &mediasoup.DtlsParameters{
+						Role:         mediasoup.DtlsRoleClient,
+						Fingerprints: requestData.DTLSFingerprints,
+					},
+				})
+				if err != nil {
+					transport.Close()
+					return err
+				}
 			}
 			transport.OnSctpStateChange(func(sctpState mediasoup.SctpState) {
 				r.logger.Debug(`WebRtcTransport "sctpstatechange" event`, "sctpState", sctpState)
