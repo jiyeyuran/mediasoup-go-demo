@@ -26,7 +26,8 @@ By adding query parameters into the URL you can set certain settings of the appl
 | `webcamScalabilityMode` | String | `scalabilityMode` for webcam | 'L1T3' for VP8/H264 (in each simulcast encoding), 'L3T3_KEY' for VP9 |
 | `sharingScalabilityMode` | String | `scalabilityMode` for screen sharing | 'L1T3' for VP8/H264 (in each simulcast encoding), 'L3T3' for VP9 |
 | `numSimulcastStreams` | Number | Number of streams for simulcast in webcam and screen sharing | 3 |
-| `info`             | Boolean | Display detailed information about media transmission | `false` |
+| `info`             | Boolean | Display detailed information about media transmission over each peer | `false` |
+| `stats`            | Boolean | Display detailed information about WebRTC stats | `false` |
 | `faceDetection`    | Boolean | Run face detection | `false` |
 | `externalVideo`    | Boolean | Send an external video instead of local webcam | `false` |
 | `e2eKey`           | String | Key for media E2E encryption/decryption (just works with some OPUS and VP8 codecs) | |

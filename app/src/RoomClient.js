@@ -56,6 +56,7 @@ export default class RoomClient {
 		e2eKey,
 		autoConnect,
 		consumerReplicas,
+		stats,
 	}) {
 		logger.debug(
 			'constructor() [roomId:"%s", peerId:"%s", displayName:"%s", device:%s]',
@@ -145,6 +146,9 @@ export default class RoomClient {
 
 		// Enabled end-to-end encryption.
 		this._e2eKey = e2eKey;
+
+		// Show WebRTC stats.
+		this._stats = stats;
 
 		// MediaStream of the external video.
 		// @type {MediaStream}
@@ -2399,8 +2403,7 @@ export default class RoomClient {
 				});
 			}
 
-			// NOTE: For testing.
-			if (window.SHOW_INFO) {
+			if (this._stats) {
 				const { me } = store.getState();
 
 				store.dispatch(stateActions.setRoomStatsPeerId(me.id));

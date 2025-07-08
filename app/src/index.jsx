@@ -82,6 +82,7 @@ async function run() {
 		? Number(urlParser.query.numSimulcastStreams)
 		: 3;
 	const info = urlParser.query.info === 'true';
+	const stats = urlParser.query.stats === 'true';
 	const faceDetection = urlParser.query.faceDetection === 'true';
 	const externalVideo = urlParser.query.externalVideo === 'true';
 	const throttleSecret = urlParser.query.throttleSecret;
@@ -134,6 +135,7 @@ async function run() {
 			case 'sharingScalabilityMode':
 			case 'numSimulcastStreams':
 			case 'info':
+			case 'stats':
 			case 'faceDetection':
 			case 'externalVideo':
 			case 'throttleSecret':
@@ -199,6 +201,7 @@ async function run() {
 		e2eKey,
 		autoConnect,
 		consumerReplicas,
+		stats,
 	});
 
 	// NOTE: For debugging.

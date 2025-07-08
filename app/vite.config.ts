@@ -71,6 +71,7 @@ async function runDev() {
     roomId: 'dev',
     _throttleSecret: 'foo',
     info: true,
+    stats: true,
   };
 
   const defaultProducer = {
