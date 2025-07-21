@@ -27,6 +27,7 @@ type TLSConfig struct {
 }
 
 type MediasoupConfig struct {
+	WorkerPath             string                           `json:"workerPath,omitempty"`
 	NumWorkers             int                              `json:"numWorkers,omitempty"`
 	WorkerSettings         *mediasoup.WorkerSettings        `json:"workerSettings,omitempty"`
 	RouterOptions          *mediasoup.RouterOptions         `json:"routerOptions,omitempty"`
@@ -93,6 +94,14 @@ func NewDefaultConfig() *Config {
 						ClockRate: 90000,
 						Parameters: mediasoup.RtpCodecSpecificParameters{
 							ProfileId:           2,
+							XGoogleStartBitrate: 1000,
+						},
+					},
+					{
+						Kind:      mediasoup.MediaKindVideo,
+						MimeType:  "video/AV1",
+						ClockRate: 90000,
+						Parameters: mediasoup.RtpCodecSpecificParameters{
 							XGoogleStartBitrate: 1000,
 						},
 					},

@@ -49,7 +49,10 @@ func NewServer(config *Config) *Server {
 		},
 	}))
 
-	workerBin := os.Getenv("MEDIASOUP_WORKER_BIN")
+	workerBin := config.Mediasoup.WorkerPath
+	if len(workerBin) == 0 {
+		workerBin = os.Getenv("MEDIASOUP_WORKER_BIN")
+	}
 	workers := []*mediasoup.Worker{}
 
 	for i := 0; i < config.Mediasoup.NumWorkers; i++ {
@@ -67,16 +70,14 @@ func NewServer(config *Config) *Server {
 
 		go func() {
 			ticker := time.NewTicker(120 * time.Second)
-			for {
-				select {
-				case <-ticker.C:
-					usage, err := worker.GetResourceUsage()
-					if err != nil {
-						logger.Error("mediasoup Worker getResourceUsage", "pid", worker.Pid(), "error", err)
-						continue
-					}
-					logger.Info("mediasoup Worker resource usage", "pid", worker.Pid(), "usage", usage)
+			defer ticker.Stop()
+			for range ticker.C {
+				usage, err := worker.GetResourceUsage()
+				if err != nil {
+					logger.Error("mediasoup Worker getResourceUsage", "pid", worker.Pid(), "error", err)
+					continue
 				}
+				logger.Info("mediasoup Worker resource usage", "pid", worker.Pid(), "usage", usage)
 			}
 		}()
 	}

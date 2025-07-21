@@ -9,6 +9,7 @@
         }
     },
     "mediasoup": {
+        "workerPath": "../../mediasoup-worker",
         "numWorkers": 1,
         "webRtcTransportOptions": {
             "listenInfos": [
