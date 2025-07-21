@@ -67,6 +67,8 @@ async function run() {
 	const forceTcp = urlParser.query.forceTcp === 'true';
 	const produce = urlParser.query.produce !== 'false';
 	const consume = urlParser.query.consume !== 'false';
+	const mic = urlParser.query.mic !== 'false';
+	const webcam = urlParser.query.webcam !== 'false';
 	const datachannel = urlParser.query.datachannel !== 'false';
 	const preferLocalCodecsOrder =
 		urlParser.query.preferLocalCodecsOrder === 'true';
@@ -123,6 +125,8 @@ async function run() {
 			case 'forceTcp':
 			case 'produce':
 			case 'consume':
+			case 'mic':
+			case 'webcam':
 			case 'datachannel':
 			case 'preferLocalCodecsOrder':
 			case 'forceVP8':
@@ -187,6 +191,8 @@ async function run() {
 		produce,
 		consume,
 		datachannel,
+		mic,
+		webcam,
 		preferLocalCodecsOrder,
 		forceVP8,
 		forceH264,

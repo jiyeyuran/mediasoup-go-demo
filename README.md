@@ -15,6 +15,8 @@ By adding query parameters into the URL you can set certain settings of the appl
 | `forceTcp`         | Boolean | Force RTC (audio/video/datachannel) over TCP instead of UDP | `false` |
 | `produce`          | Boolean | Enable sending of audio/video | `true`  |
 | `consume`          | Boolean | Enable reception of audio/video | `true` |
+| `mic`              | Boolean | Enable microphone by default | `true` |
+| `webcam`           | Boolean | Enable webcam by default | `true` |
 | `datachannel`      | Boolean | Enable DataChannels | `true` |
 | `preferLocalCodecsOrder` | Boolean | Prefer the codecs order of the browser instead of the codecs order configured in the server | `false` |
 | `forceVP8`        | Boolean | Force VP8 codec for webcam and screen sharing | `false` |

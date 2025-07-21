@@ -41,6 +41,8 @@ export default class RoomClient {
 		forceTcp,
 		produce,
 		consume,
+		mic,
+		webcam,
 		datachannel,
 		enableWebcamLayers,
 		enableSharingLayers,
@@ -94,6 +96,14 @@ export default class RoomClient {
 		// Whether we should consume.
 		// @type {Boolean}
 		this._consume = consume;
+
+		// Whether we should enable mic by default.
+		// @type {Boolean}
+		this._useMic = Boolean(mic);
+
+		// Whether we should enable webcam by default.
+		// @type {Boolean}
+		this._useWebcam = Boolean(webcam);
 
 		// Whether we want DataChannels.
 		// @type {Boolean}
@@ -2384,13 +2394,15 @@ export default class RoomClient {
 					})
 				);
 
-				this.enableMic();
+				if (this._useMic) {
+					this.enableMic();
+				}
 
 				const devicesCookie = cookiesManager.getDevices();
 
 				if (
-					!devicesCookie ||
-					devicesCookie.webcamEnabled ||
+					(this._useWebcam &&
+						(!devicesCookie || devicesCookie.webcamEnabled)) ||
 					this._externalVideo
 				)
 					this.enableWebcam();
