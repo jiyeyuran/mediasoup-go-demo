@@ -331,17 +331,17 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 
 			// NOTE: For testing.
 			// transport.EnableTraceEvent("probation", "bwe")
-			if err = transport.EnableTraceEvent([]mediasoup.TransportTraceEventType{mediasoup.TransportTraceEventBWE}); err != nil {
-				return err
-			}
+			// if err = transport.EnableTraceEvent([]mediasoup.TransportTraceEventType{mediasoup.TransportTraceEventBWE}); err != nil {
+			// 	return err
+			// }
 
-			transport.OnTrace(func(trace *mediasoup.TransportTraceEventData) {
-				r.logger.Debug(`"transport "trace" event`, "transportId", transport.Id(), "trace.type", trace.Type, "trace", trace)
+			// transport.OnTrace(func(trace *mediasoup.TransportTraceEventData) {
+			// 	r.logger.Debug(`"transport "trace" event`, "transportId", transport.Id(), "trace.type", trace.Type, "trace", trace)
 
-				if trace.Type == "bwe" && trace.Direction == "out" {
-					peer.Notify("downlinkBwe", trace.Info)
-				}
-			})
+			// 	if trace.Type == "bwe" && trace.Direction == "out" {
+			// 		peer.Notify("downlinkBwe", trace.Info)
+			// 	}
+			// })
 
 			// Store the WebRtcTransport into the protoo Peer data Object.
 			peerData.AddTransport(transport)
@@ -461,9 +461,9 @@ func (r *Room) handleProtooRequest(peer *protoo.Peer, request protoo.Message, ac
 		// producer.EnableTraceEvent("pli", "fir");
 		// producer.EnableTraceEvent("keyframe");
 
-		producer.OnTrace(func(trace mediasoup.ProducerTraceEventData) {
-			r.logger.Debug(`producer "trace" event`, "producerId", producer.Id(), "trace.type", trace.Type, "trace", trace)
-		})
+		// producer.OnTrace(func(trace mediasoup.ProducerTraceEventData) {
+		// 	r.logger.Debug(`producer "trace" event`, "producerId", producer.Id(), "trace.type", trace.Type, "trace", trace)
+		// })
 
 		accept(H{"id": producer.Id()})
 
@@ -942,9 +942,9 @@ func (r *Room) createConsumer(consumerPeer *protoo.Peer, producerPeerId string, 
 	// consumer.EnableTraceEvent("pli", "fir");
 	// consumer.EnableTraceEvent("keyframe");
 
-	consumer.OnTrace(func(trace mediasoup.ConsumerTraceEventData) {
-		r.logger.Debug(`consumer "trace" event`, "trace", trace, "consumerId", consumer.Id(), "type", trace.Type)
-	})
+	// consumer.OnTrace(func(trace mediasoup.ConsumerTraceEventData) {
+	// 	r.logger.Debug(`consumer "trace" event`, "trace", trace, "consumerId", consumer.Id(), "type", trace.Type)
+	// })
 
 	go func() {
 		// Send a protoo request to the remote Peer with Consumer parameters.
