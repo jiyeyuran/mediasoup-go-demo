@@ -56,7 +56,8 @@ func NewDefaultConfig() *Config {
 		Mediasoup: MediasoupConfig{
 			NumWorkers: runtime.NumCPU(),
 			WorkerSettings: &mediasoup.WorkerSettings{
-				LogLevel: mediasoup.WorkerLogLevelWarn,
+				WorkerVersion: mediasoup.MEDIASOUP_WORKER_VERSION,
+				LogLevel:      mediasoup.WorkerLogLevelWarn,
 				LogTags: []mediasoup.WorkerLogTag{
 					"info",
 					"ice",

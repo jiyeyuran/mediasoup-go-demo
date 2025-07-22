@@ -840,7 +840,7 @@ export default class RoomClient {
 					})
 				);
 
-				this.disableMic().catch(() => {});
+				this.disableMic().catch(() => { });
 			});
 		} catch (error) {
 			logger.error('enableMic() | failed:%o', error);
@@ -1096,7 +1096,7 @@ export default class RoomClient {
 					})
 				);
 
-				this.disableWebcam().catch(() => {});
+				this.disableWebcam().catch(() => { });
 			});
 		} catch (error) {
 			logger.error('enableWebcam() | failed:%o', error);
@@ -1424,7 +1424,7 @@ export default class RoomClient {
 					})
 				);
 
-				this.disableShare().catch(() => {});
+				this.disableShare().catch(() => { });
 			});
 		} catch (error) {
 			logger.error('enableShare() | failed:%o', error);
@@ -2170,6 +2170,34 @@ export default class RoomClient {
 						certificates: this._cert ? [this._cert] : undefined,
 					},
 				});
+
+				let state = null;
+
+				window.addEventListener('online', () => {
+					logger.debug('[_sendTransport] network Back online', new Date().toISOString());
+					if (state === 'failed') {
+						logger.warn(
+							'[_sendTransport] network Back online but connectionState is "failed"'
+						);
+						this.restartIce();
+						state = null;
+					}
+				});
+
+				window.addEventListener('offline', () => {
+					logger.debug('[_sendTransport] network Offline', new Date().toISOString());
+				});
+
+				this._sendTransport.on(
+					'connectionstatechange',
+					connectionState => {
+						logger.debug(
+							'_sendTransport "connectionstatechange" event: [connectionState:%s]',
+							connectionState, new Date().toISOString(),
+						);
+						state = connectionState;
+					}
+				);
 
 				this._sendTransport.on(
 					'connect',

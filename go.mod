@@ -10,12 +10,13 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/gorilla/websocket v1.4.2
 	github.com/jiyeyuran/go-protoo v1.0.7
-	github.com/jiyeyuran/mediasoup-go/v2 v2.0.0
+	github.com/jiyeyuran/mediasoup-go/v2 v2.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 )
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/zerologr v1.2.3 // indirect
